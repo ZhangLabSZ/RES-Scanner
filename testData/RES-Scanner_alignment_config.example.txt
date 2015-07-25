@@ -1,0 +1,6 @@
+DNA	gynes	DNA_gynes	500	/usr/bin/testData/fastq/DNA/DNA_gynes/DNA_gynes_1.fq.gz	/usr/bin/testData/fastq/DNA/DNA_gynes/DNA_gynes_2.fq.gz
+DNA	large_workers	DNA_large_workers	500	/usr/bin/testData/fastq/DNA/DNA_large_workers/DNA_large_workers_1.fq.gz	/usr/bin/testData/fastq/DNA/DNA_large_workers/DNA_large_workers_2.fq.gz
+DNA	small_workers	DNA_small_workers	500	/usr/bin/testData/fastq/DNA/DNA_small_workers/DNA_small_workers_1.fq.gz	/usr/bin/testData/fastq/DNA/DNA_small_workers/DNA_small_workers_2.fq.gz
+RNA	gynes	RNA_gyne_heads	100000	/usr/bin/testData/fastq/RNA/RNA_gyne_heads/RNA_gyne_heads_1.fq.gz	/usr/bin/testData/fastq/RNA/RNA_gyne_heads/RNA_gyne_heads_2.fq.gz
+RNA	large_workers	RNA_large_worker_heads	100000	/usr/bin/testData/fastq/RNA/RNA_large_worker_heads/RNA_large_worker_heads_1.fq.gz	/usr/bin/testData/fastq/RNA/RNA_large_worker_heads/RNA_large_worker_heads_2.fq.gz
+RNA	small_workers	RNA_small_worker_heads	100000	/usr/bin/testData/fastq/RNA/RNA_small_worker_heads/RNA_small_worker_heads_1.fq.gz	/usr/bin/testData/fastq/RNA/RNA_small_worker_heads/RNA_small_worker_heads_2.fq.gz
