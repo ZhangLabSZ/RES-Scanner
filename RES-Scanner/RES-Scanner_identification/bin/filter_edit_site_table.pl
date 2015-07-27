@@ -29,8 +29,8 @@ GetOptions (
 		"Bayesian_P:s"=>\$Bayesian_Posterior_Probability,
 		"Binomial_P:s"=>\$P_value_DNA_Heterozygosis,
 		"Binomial_FDR:s"=>\$FDR_DNA_Heterozygosis,
-		"Stringent_N:s"=>\$Non_Ref_BaseCount,
-		"Stringent_R:s"=>\$Non_Ref_BaseRatio,
+		"Frequency_N:s"=>\$Non_Ref_BaseCount,
+		"Frequency_R:s"=>\$Non_Ref_BaseRatio,
 		"editPvalue:s"=>\$p,
 		"help"=>\$help,
 		);
@@ -42,18 +42,18 @@ Description:
 		--DNAdepth          The homozygous DNA depth [optional(default:7)]
 		--RNAdepth          The minimum cutoff for RNA reads coverage. [3]
 		--editLevel         The minimum cutoff for editing level. [0.05]
-		--method            Method for detecting SNPs.'Bayesian' or 'Binomial' or 'Stringent'. [Bayesian]
+		--method            Method for detecting SNPs.'Bayesian' or 'Binomial' or 'Frequency'. [Bayesian]
 		--Bayesian_P        The minimun Bayesian Posterior Probability cutoff for corresponding genotype.(force --method Bayesian) [0.95]
 		--Binomial_P        The maximun P value cutoff of Binomial test for DNA Heterozygosis. (force --method Binomial) [0.05]
 		--Binomial_FDR      The maximun FDR cutoff of Binomial test for DNA Heterozygosis. (force --method Binomial) [0.05]
-		--Stringent_N       The maximun non-refference base count cutoff. (force --method Stringent) [0]
-		--Stringent_R       The maximun non-refference base ratio cutoff. (force --method Stringent) [0]
+		--Frequency_N       The maximun non-refference base count cutoff. (force --method Frequency) [0]
+		--Frequency_R       The maximun non-refference base ratio cutoff. (force --method Frequency) [0]
 		--readType          The least number of RNA reads that were mapped to overlapping but not identical positions in the reference genome 
 		                    that supporting an RNA-editing site in a given sample. [3]
 		--goodRead          The least number of RNA reads which in the middle of their length supporting an editing site 
 		                    (that is, from positions 26~75 of the 100-bp read), to avoid potential false positives resulting 
 		                    from mis-mapping of reads at splice junctions. [1]
-		--editPvalue                 Cutoff of FDR RNA editing. [0.05]
+		--editPvalue        Cutoff of FDR RNA editing. [0.05]
 		--help              Show the help information.
 
 
@@ -85,7 +85,7 @@ while (<IN>) {
 		}elsif($method eq "Binomial"){
 			next unless $label1<$P_value_DNA_Heterozygosis;
 			next unless $label2<$FDR_DNA_Heterozygosis;
-		}elsif($method eq "Stringent"){
+		}elsif($method eq "Frequency"){
 			next if $label1>$Non_Ref_BaseCount;
 			next if $label2>$Non_Ref_BaseRatio;
 		}else{

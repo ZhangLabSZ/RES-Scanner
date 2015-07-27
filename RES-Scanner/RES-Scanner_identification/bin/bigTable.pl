@@ -5,7 +5,6 @@ use Cwd 'abs_path';
 use Getopt::Long;
 my ($config,$phred,$qual_cutoff,$genome,$intron,$homopolymer,$paralogous_D);
 my $HomoPrior ||= 0.99;
-my $HetePrior = 1-$HomoPrior;
 my $rate ||= 2; #the rate of transition over transversion
 my $method ||= "Bayesian";
 my $ploidy ||= 2;
@@ -74,6 +73,7 @@ if($method ne "Bayesian" && $method ne "Binomial" && $method ne "Frequency"){
 }elsif($method eq "Bayesian" && !$genome){
 	die "Error: options --genome is undefined in Bayesian mode\n";
 }
+my $HetePrior = 1-$HomoPrior;
 my %hash;
 my @order;
 open IN,"$config" or die $!;

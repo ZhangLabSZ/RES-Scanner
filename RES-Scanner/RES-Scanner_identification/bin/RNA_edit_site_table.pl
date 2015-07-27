@@ -7,7 +7,6 @@ use Cwd 'abs_path';
 my ($RNA_singleBase,$DNA_singleBase,$DNAdepth,$phred,$qual_cutoff,$RNAdepth,$editLevel,$editDepth,$strand,$RNA_bam,$ploidy,$samtools,$genome,$method);
 
 my $HomoPrior ||= 0.99;
-my $HetePrior ||= 0.01;
 my $rate ||= 4; #the rate of transition over transversion
 #$DNAdepth ||= 7;
 #$RNAdepth ||= 3;
@@ -33,7 +32,6 @@ GetOptions (
 		"ploidy:s"=>\$ploidy,
 		"samtools:s"=>\$samtools,
 		"HomoPrior:s"=>\$HomoPrior,
-		"HetePrior:s"=>\$HetePrior,
 		"rate:s"=>\$rate,
 		"method:s"=>\$method,
 		);
@@ -51,9 +49,8 @@ Description:
 		--strand            The strand of data, '+' or '-' for strand specific data, 'unknown' for non-strand specific data.
 		--ploidy            The ploidy level, 1 for monoploid , 2 for diploid, 3 for triploid, 4 for tetraploid, and so on. [2].
 		--samtools          The absolute path of pre-installed SAMtools package;
-		--method            Method for detecting SNPs.'Bayesian' or 'Binomial' or 'Stringent'. [Bayesian]
+		--method            Method for detecting SNPs.'Bayesian' or 'Binomial' or 'Frequency'. [Bayesian]
 		--HomoPrior         The prior probability of homozygous genomic positions. (force --method Bayesian) [0.99]
-		--HetePrior         The prior probability of heterozygous genomic positions. (force --method Bayesian) [0.01]
 		--rate              The rate of transitions over transversions of the genome. (force --method Bayesian) [4]
 
 
@@ -64,6 +61,7 @@ Usage End.
 		exit;
 }
 
+my $HetePrior = 1-$HomoPrior;
 die "$RNA_singleBase does not exist!\n" unless -e $RNA_singleBase;
 die "$DNA_singleBase doesn't exist!\n" unless -e $DNA_singleBase;
 die "$samtools doesn't exist!\n" unless -e $samtools;
@@ -73,8 +71,8 @@ if($strand ne "+" && $strand ne "-" && $strand ne "unknown"){
 	die "Input Error: --strand should be '+' or '-' or 'unknown'!\n";
 }
 
-if($method ne "Bayesian" && $method ne "Binomial" && $method ne "Stringent"){
-	die "Error: unknown options value '$method' for --Method [Bayesian|Binomial|Stringent]\n";
+if($method ne "Bayesian" && $method ne "Binomial" && $method ne "Frequency"){
+	die "Error: unknown options value '$method' for --Method [Bayesian|Binomial|Frequency]\n";
 }elsif($method eq "Bayesian" && !$genome){
 	die "Error: options --genome is undefined in Bayesian mode\n";
 }
@@ -194,8 +192,8 @@ while (<IN>) {
 	}elsif($method eq "Binomial"){
 		@result = &SNPvalue_Binomial($dna_info,$ref_base,$ploidy);
 		$homo{$info[0]}{$info[1]} = [$coverage,$ref_base,$dna_info,$result[0]];
-	}elsif($method eq "Stringent"){
-		@result = &SNPvalue_Stringent($seq,$ref_base);
+	}elsif($method eq "Frequency"){
+		@result = &SNPvalue_Frequency($seq,$ref_base);
 		$homo{$info[0]}{$info[1]} = [$coverage,$ref_base,$dna_info,$result[0],$result[1]];
 	}else{
 		die "Error: unknown --Method $method";
@@ -452,7 +450,7 @@ if($method eq "Bayesian"){
 	($title1,$title2)=("Bayesian_Genotype(DNA)","Bayesian_Posterior_Probability(DNA)");
 }elsif($method eq "Binomial"){
 	($title1,$title2)=("P_value(DNA_Heterozygosis)","FDR(DNA_Heterozygosis)");
-}elsif($method eq "Stringent"){
+}elsif($method eq "Frequency"){
 	($title1,$title2)=("Non_Ref_BaseCount(DNA)","Non_Ref_BaseRatio(DNA)");
 }else{
 	die "Error: unknown --Method $method\n";
@@ -467,7 +465,7 @@ foreach my $value (@pvalue_result){
 }
 
 $time= &getTime();
-print STDERR "$time\tRaw candidate RNA editing sites is generated.!\n";
+print STDERR "$time\tRaw candidate RNA editing sites is generated!\n";
 
 ##
 
@@ -715,7 +713,7 @@ sub SNPvalue_Binomial{
 }
 
 
-sub SNPvalue_Stringent{
+sub SNPvalue_Frequency{
 	my ($s,$r)=@_;
 	my @S=split //,$s;
 	my $totalDep=@S;

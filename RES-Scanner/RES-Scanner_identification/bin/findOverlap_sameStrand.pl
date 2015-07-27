@@ -20,11 +20,6 @@ Description:
 	Column 8: the first subject block ame.Group4.17 overlapped with ame.Group1.64, + is the strand of ame.Group4.17, 326 is its own size, 209 is the overlapped size;
 	Column 9: the second subject block ame.Group16.8 overlapped with ame.Group1.64, + is the strand of ame.Group16.8, numbers has the same meaning as last column;
 
-Version:
-	
-	Author: jinlijun, jinlijun\@genomics.org.cn
-	Version: 1.0,  Date: 2011-05-18
-
 Usage
 	
 	perl findOverlap.pl <ref> [pre]

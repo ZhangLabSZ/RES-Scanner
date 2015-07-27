@@ -57,7 +57,7 @@ if($count>0){
 	system "mv $outdir/temp.$n.$filename $outBamfile";
 }else{
 #	print STDERR "Log: There is no ambiguous mapping between BWA and BLAT!\n";
-	system "ln -s $inBamfile $outBamfile";
+	system "ln -sf $inBamfile $outBamfile";
 }
 
 

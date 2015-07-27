@@ -49,12 +49,6 @@ while (<IN>) {
 	$CODE{$codon} = "*" unless (exists $CODE{$codon});
 	my $amino = $CODE{$codon};
 	my $C_a = join "$info[7]",$info[6],$amino;
-#	my $key;
-#	$key = 0 if ($info[6] eq $amino);
-#	$key = 1 if ($info[6] ne $amino);
-#	$key = -1 if ($amino eq "U" && $info[6] ne "U");
-#	$key = 2 if ($amino ne "U" && $info[6] eq "U");
-#	$result{$info[0]}{$info[1]}{$info[2]} = [$C_c,$C_a,$key];
 	$result{$info[0]}{$info[1]}{$info[2]} = [$C_c,$C_a];
 }
 close IN;

@@ -44,6 +44,7 @@ GetOptions(
 		"phred:s"=>\$phred,
 		"DNAdepth:s"=>\$DNAdepth,
 		"RNAdepth:s"=>\$RNAdepth,
+		"editDepth:s"=>\$readType,
 		"posdir:s"=>\$posdir,
 		"editLevel:s"=>\$editLevel,
 		"editPvalue:s"=>\$pvalue,
@@ -387,6 +388,10 @@ if(defined $posdir){
 		print STEP4RE "perl $Amino_acid_change $OutDir/RES_final_result.annotation $OutDir/codon.database > $OutDir/RES_final_result.annotation.temp\n";
 		print STEP4RE "mv -f $OutDir/RES_final_result.annotation.temp $OutDir/RES_final_result.annotation\n";
 	}
+	print STEP4RE "echo step4 work is completed! > $OutDir/step4.log\n";
+	print STEP4RE "echo step4 work is completed!\n";
+	print STEP4RE "echo File '$OutDir/RES_final_result.annotation' is the final result! >> $OutDir/step4.log\n";
+	print STEP4RE "echo File '$OutDir/RES_final_result.annotation' is the final result!\n";
 }else{
 	if($method eq "Bayesian"){
 		print STEP4RE "perl $bigTable --config $OutDir/bigTable.config --genome $genome --phred $phred --qual_cutoff $q --method $method --HomoPrior $HomoPrior --rate $rate --ploidy $ploidy --DNAdepth $DNAdepth --RNAdepth $RNAdepth --Bayesian_P $Bayesian_Posterior_Probability --paralogous_D $paralogous_D --homopolymer $homopolymer > $OutDir/RES_final_result.txt\n";
@@ -401,10 +406,12 @@ if(defined $posdir){
 		print STEP4RE "perl $filter_sites_in_paralogous_regions $OutDir/RES_final_result.txt.bilateral_sequence.fa.psl $OutDir/RES_final_result.txt > $OutDir/RES_final_result.txt.filter\n";
 		print STEP4RE "mv -f $OutDir/RES_final_result.txt.filter $OutDir/RES_final_result.txt\n";
 	}
+	print STEP4RE "echo step4 work is completed! > $OutDir/step4.log\n";
+	print STEP4RE "echo step4 work is completed!\n";
+	print STEP4RE "echo File '$OutDir/RES_final_result.txt' is the final result! >> $OutDir/step4.log\n";
+	print STEP4RE "echo File '$OutDir/RES_final_result.txt' is the final result!\n";
 }
 
-print STEP4RE "echo step4 work is completed! > $OutDir/step4.log\n";
-print STEP4RE "echo step4 work is completed!\n";
 close STEP4RE;
 
 print STDERR "####################################################################################################\n";
