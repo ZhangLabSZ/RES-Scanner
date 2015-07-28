@@ -42,7 +42,7 @@ Options:
 	--config     FILE   The configuration file that contains the information of DNA-Seq or RNA-Seq data.
 	--bwa        FILE   The absolute path of BWA software pre-installed in local machine.
 	--samtools   FILE   The absolute path of SAMtools software pre-installed in local machine.
-	--index      NUM    The reference genome is indexed or not, '1' for yes, '0' for not, default yes. [1]
+	--index      NUM    The reference genome is indexed in part1 or not, '1' for yes, '0' for not, default yes. [1]
 	--help              Show the help information.
 
 Usage:
@@ -109,8 +109,8 @@ while(<IN>){
 			}
 			print OUT "$bwa sampe -a $x $ref $outdir/$tag/$lib/$lane/fq$i/$lane.1.sai $outdir/$tag/$lib/$lane/fq$i/$lane.2.sai $a_fq $b_fq 2>$outdir/$tag/$lib/$lane/fq$i/$lane.bwa.bam.log | $samtools view -hbS - > $outdir/$tag/$lib/$lane/fq$i/$lane.bwa.bam 2>>$outdir/$tag/$lib/$lane/fq$i/$lane.bwa.bam.log\n";
 			print OUT "rm $outdir/$tag/$lib/$lane/fq$i/$lane.1.sai $outdir/$tag/$lib/$lane/fq$i/$lane.2.sai\n";
-			print OUT "echo $tag $lane BWA mapping work is completed! > $outdir/$tag/$lib/$lane/fq$i/$lane.log\n";
-			print OUT "echo $tag $lane BWA mapping work is completed!\n";
+			print OUT "echo $tag $lane BWA mapping work-complete! > $outdir/$tag/$lib/$lane/fq$i/$lane.log\n";
+			print OUT "echo $tag $lane BWA mapping work-complete!\n";
 			close OUT;
 			system("echo sh $outdir/$tag/$lib/$lane/fq$i/run.sh >> $outdir/step2.sh");
 			push @{$bam_hash{$tag}{$lib}},"$outdir/$tag/$lib/$lane/fq$i/$lane.bwa.bam";
@@ -129,8 +129,8 @@ while(<IN>){
 			}
 			print OUT "$bwa samse $ref $outdir/$tag/$lib/$lane/fq$i/$lane.1.sai $a_fq 2>$outdir/$tag/$lib/$lane/fq$i/$lane.bwa.bam.log | $samtools view -hbS - > $outdir/$tag/$lib/$lane/fq$i/$lane.bwa.bam 2>>$outdir/$tag/$lib/$lane/fq$i/$lane.bwa.bam.log\n";
 			print OUT "rm $outdir/$tag/$lib/$lane/fq$i/$lane.1.sai\n";
-			print OUT "echo $tag $lane BWA mapping work is completed! > $outdir/$tag/$lib/$lane/fq$i/$lane.log\n";
-			print OUT "echo $tag $lane BWA mapping work is completed!\n";
+			print OUT "echo $tag $lane BWA mapping work-complete! > $outdir/$tag/$lib/$lane/fq$i/$lane.log\n";
+			print OUT "echo $tag $lane BWA mapping work-complete!\n";
 			close OUT;
 			system("echo sh $outdir/$tag/$lib/$lane/fq$i/run.sh >> $outdir/step2.sh");
 			push @{$bam_hash{$tag}{$lib}},"$outdir/$tag/$lib/$lane/fq$i/$lane.bwa.bam";

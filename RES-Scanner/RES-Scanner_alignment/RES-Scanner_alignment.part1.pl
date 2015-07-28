@@ -63,6 +63,46 @@ foreach my $script ($bwa) {
 	die "$script not exist!" unless -e $script;
 }
 
+###check configure file
+
+my %checkLane;
+my %pair;
+open IN,"$config" or die $!;
+while(<IN>){
+	chomp;
+	my @A=split /\s+/,$_;
+	if($A[0] ne "RNA" && $A[0] ne "DNA"){
+		die "Warning: tag '$A[0]' should be 'DNA' or 'RNA' in configure file $config\n$_\n";
+	}
+	$checkLane{$A[2]}++;
+	$pair{$A[1]}{$A[0]}=1;
+	for(my $i=4;$i<@A;$i++){
+		die "Error: $A[$i] is not existent in $config !\n" unless -e $A[$i];
+	}
+}
+close IN;
+
+foreach my $lane (keys %checkLane){
+	if($checkLane{$lane}>1){
+		die "Error: lane ID: $lane should be unique in file $config!\n";
+	}
+}
+
+my $pair_flag=0;
+foreach my $sample (sort keys %pair){
+	if(!exists $pair{$sample}{'DNA'}){
+		print STDERR "Error: There is no matched DNA-Seq data for sample '$sample' in configure file $config!\n";
+		$pair_flag=1;
+	}
+	if(!exists $pair{$sample}{'RNA'}){
+		print STDERR "Error: There is no matched RNA-Seq data for sample '$sample' in configure file $config!\n";
+		$pair_flag=1;
+	}
+}
+if($pair_flag){
+	die "Error: The configure file $config should be revised with matched DNA-Seq and RNA-Seq data for each sample name.\n";
+}
+
 
 ## index reference
 if($index){
@@ -102,26 +142,6 @@ if($index){
 }
 
 ########  split fastq files to limit memory  ###########
-my %checkLane;
-open IN,"$config" or die $!;
-while(<IN>){
-	chomp;
-	my @A=split /\s+/,$_;
-	if($A[0] ne "RNA" && $A[0] ne "DNA"){
-		die "Warning: tag '$A[0]' should be 'DNA' or 'RNA' in configure file $config\n$_\n";
-	}
-	$checkLane{$A[2]}++;
-	for(my $i=4;$i<@A;$i++){
-		die "Error: $A[$i] is not existent in $config !\n" unless -e $A[$i];
-	}
-}
-close IN;
-
-foreach my $lane (keys %checkLane){
-	if($checkLane{$lane}>1){
-		die "Error: lane ID: $lane should be unique in file $config!\n";
-	}
-}
 open IN,"$config" or die $!;
 while(<IN>){
 	chomp;
