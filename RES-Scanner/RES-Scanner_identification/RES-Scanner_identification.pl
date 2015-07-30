@@ -198,7 +198,7 @@ while(<IN>){
 #DNA shell beg
 	open STEP1DNA,">$outdir/step1_DNA.sh" or die $!;
 	print STEP1DNA "perl $bestUniq $dnaBamfile $outdir $samtools  --mis $mis --mq $mq --ss 0 --soft $soft\n";
-	print STEP1DNA "$samtools sort $outdir/$DNAfilename.best.bam $outdir/$DNAfilename.best.DNA.sort 2>$outdir/$DNAfilename.best.DNA.sort.log\n";
+	print STEP1DNA "$samtools sort $outdir/$DNAfilename.best.bam $outdir/$DNAfilename.best.DNA.sort\n";
 	print STEP1DNA "$samtools rmdup $outdir/$DNAfilename.best.DNA.sort.bam $outdir/$DNAfilename.best.DNA.sort.rmdup.bam 2>$outdir/$DNAfilename.best.DNA.sort.rmdup.bam.log\n";
 	print STEP1DNA "perl $sam2base --trim $trim $genome $outdir/$DNAfilename.best.DNA.sort.rmdup.bam $outdir/$DNAfilename.best.DNA.sam2base.gz --samtools $samtools\n";
 	print STEP1DNA "perl $sam2base_statistic $genome $outdir/$DNAfilename.best.DNA.sam2base.gz > $outdir/$RNAfilename.best.DNA.sam2base.stat\n";
@@ -235,16 +235,16 @@ while(<IN>){
 		print STEP3 "if [ ! -f \"$outdir/step2_RNA.log\" ];then echo \"Warning: $outdir/step2_RNA.sh work is not completed! as $outdir/step2_RNA.log is not existent\"\nexit 0\nfi\n";
 	}
 	if($ss){
-		print STEP2RNAPOS "$samtools sort $outdir/$RNAfilename.positive.bam $outdir/$RNAfilename.positive.RNA.sort 2>$outdir/$RNAfilename.positive.RNA.sort.log\n";
+		print STEP2RNAPOS "$samtools sort $outdir/$RNAfilename.positive.bam $outdir/$RNAfilename.positive.RNA.sort\n";
 		print STEP2RNAPOS "$samtools rmdup  $outdir/$RNAfilename.positive.RNA.sort.bam $outdir/$RNAfilename.positive.RNA.sort.rmdup.bam 2>$outdir/$RNAfilename.positive.RNA.sort.rmdup.bam.log\n";
-		print STEP2RNANEG "$samtools sort $outdir/$RNAfilename.negative.bam $outdir/$RNAfilename.negative.RNA.sort 2>$outdir/$RNAfilename.negative.RNA.sort.log\n";
+		print STEP2RNANEG "$samtools sort $outdir/$RNAfilename.negative.bam $outdir/$RNAfilename.negative.RNA.sort\n";
 		print STEP2RNANEG "$samtools rmdup  $outdir/$RNAfilename.negative.RNA.sort.bam $outdir/$RNAfilename.negative.RNA.sort.rmdup.bam 2>$outdir/$RNAfilename.negative.RNA.sort.rmdup.bam.log\n";
 		print STEP2RNAPOS "rm $outdir/$RNAfilename.positive.bam\n";
 		print STEP2RNANEG "rm $outdir/$RNAfilename.negative.bam\n";
 		print STEP2RNAPOS "perl $Bam2FaQuery --sam $outdir/$RNAfilename.positive.RNA.sort.rmdup.bam --out $outdir/$RNAfilename.positive.RNA.Query.fa --ss 1 --positive --samtools $samtools\n";
 		print STEP2RNANEG "perl $Bam2FaQuery --sam $outdir/$RNAfilename.negative.RNA.sort.rmdup.bam --out $outdir/$RNAfilename.negative.RNA.Query.fa --ss 1 --negative --samtools $samtools\n";
-		print STEP2RNAPOS "$blat $genome $outdir/$RNAfilename.positive.RNA.Query.fa $outdir/$RNAfilename.positive.RNA.Query.fa.psl -t=dna -q=dna -minIdentity=95 2>$outdir/$RNAfilename.positive.RNA.Query.fa.psl.log\n";	
-		print STEP2RNANEG "$blat $genome $outdir/$RNAfilename.negative.RNA.Query.fa $outdir/$RNAfilename.negative.RNA.Query.fa.psl -t=dna -q=dna -minIdentity=95 2>$outdir/$RNAfilename.negative.RNA.Query.fa.psl.log\n";
+		print STEP2RNAPOS "$blat $genome $outdir/$RNAfilename.positive.RNA.Query.fa $outdir/$RNAfilename.positive.RNA.Query.fa.psl -t=dna -q=dna -minIdentity=95\n";	
+		print STEP2RNANEG "$blat $genome $outdir/$RNAfilename.negative.RNA.Query.fa $outdir/$RNAfilename.negative.RNA.Query.fa.psl -t=dna -q=dna -minIdentity=95\n";
 		print STEP2RNAPOS "perl $GetAlignmentErrorsID $outdir/$RNAfilename.positive.RNA.Query.fa.psl > $outdir/$RNAfilename.positive.RNA.Query.fa.psl.errID\n";
 		print STEP2RNANEG "perl $GetAlignmentErrorsID $outdir/$RNAfilename.negative.RNA.Query.fa.psl > $outdir/$RNAfilename.negative.RNA.Query.fa.psl.errID\n";
 		print STEP2RNAPOS "perl $filter_abnormal_alignment_forBWA $outdir/$RNAfilename.positive.RNA.Query.fa.psl.errID $outdir/$RNAfilename.positive.RNA.sort.rmdup.bam $outdir/$RNAfilename.positive.RNA.sort.rmdup.correct.bam $samtools\n";
@@ -272,11 +272,11 @@ while(<IN>){
 		print STEP3POS "perl $filter_edit_site_table --input $outdir/$RNAfilename.positive.RNA.sam2base.homo.gz --DNAdepth $DNAdepth --RNAdepth $RNAdepth --editLevel $editLevel --readType $readType --goodRead $goodRead --editPvalue $pvalue $filter_options | gzip > $outdir/$RNAfilename.positive.RNA.sam2base.homo.filter.gz\n";
 		print STEP3NEG "perl $filter_edit_site_table --input $outdir/$RNAfilename.negative.RNA.sam2base.homo.gz --DNAdepth $DNAdepth --RNAdepth $RNAdepth --editLevel $editLevel --readType $readType --goodRead $goodRead --editPvalue $pvalue $filter_options | gzip > $outdir/$RNAfilename.negative.RNA.sam2base.homo.filter.gz\n";
 	}else{
-		print STEP2RNA "$samtools sort $outdir/$RNAfilename.best.bam $outdir/$RNAfilename.best.RNA.sort 2>$outdir/$RNAfilename.best.RNA.sort.log\n";
+		print STEP2RNA "$samtools sort $outdir/$RNAfilename.best.bam $outdir/$RNAfilename.best.RNA.sort\n";
 		print STEP2RNA "$samtools rmdup  $outdir/$RNAfilename.best.RNA.sort.bam $outdir/$RNAfilename.best.RNA.sort.rmdup.bam 2>$outdir/$RNAfilename.best.RNA.sort.rmdup.bam.log\n";
 		print STEP2RNA "rm $outdir/$RNAfilename.best.bam\n";
 		print STEP2RNA "perl $Bam2FaQuery --sam $outdir/$RNAfilename.best.RNA.sort.rmdup.bam --out $outdir/$RNAfilename.best.RNA.Query.fa --ss 0 --samtools $samtools\n";
-		print STEP2RNA "$blat $genome $outdir/$RNAfilename.best.RNA.Query.fa $outdir/$RNAfilename.best.RNA.Query.fa.psl -t=dna -q=dna -minIdentity=95 2>$outdir/$RNAfilename.best.RNA.Query.fa.psl.log\n";
+		print STEP2RNA "$blat $genome $outdir/$RNAfilename.best.RNA.Query.fa $outdir/$RNAfilename.best.RNA.Query.fa.psl -t=dna -q=dna -minIdentity=95\n";
 		print STEP2RNA "perl $GetAlignmentErrorsID $outdir/$RNAfilename.best.RNA.Query.fa.psl > $outdir/$RNAfilename.best.RNA.Query.fa.psl.errID\n";
 		print STEP2RNA "perl $filter_abnormal_alignment_forBWA $outdir/$RNAfilename.best.RNA.Query.fa.psl.errID $outdir/$RNAfilename.best.RNA.sort.rmdup.bam $outdir/$RNAfilename.best.RNA.sort.rmdup.correct.bam $samtools\n";
 		print STEP2RNA "perl $sam2base --trim $trim $genome $outdir/$RNAfilename.best.RNA.sort.rmdup.correct.bam $outdir/$RNAfilename.best.RNA.sam2base.gz --samtools $samtools\n";

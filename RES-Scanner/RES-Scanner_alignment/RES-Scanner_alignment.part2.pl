@@ -163,7 +163,7 @@ foreach my $tag (keys %bam_hash){
 		foreach my $file(@With){
 			print OUT " $file";
 		}
-		print OUT "2>$dir/$lib.merge.bam.log\n";
+		print OUT "\n";
 	}elsif(@With==1){
 		my $file=$With[0];
 		my $logfile=$file;
