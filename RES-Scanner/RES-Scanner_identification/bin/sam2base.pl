@@ -5,12 +5,12 @@ use File::Basename qw(dirname);
 use Getopt::Long;
 die "
 ################################## Usage ##################################
-Usage: $0 <genome.fa> <sorted.sam> <outfile.gz> --trim [0] --samtools <abs_path samtools>
+Usage: $0 <genome.fa> <sorted.sam> <outfile.gz> --trim [0,0] --samtools <abs_path samtools>
 Attention: The file.sam should be sorted by chromosome ID and leftmost mapping position!
 ################################## Usage ##################################
 \n" unless @ARGV>=5;
 
-my $cut ||= 0;
+my $cut ||= "0,0";
 my $samtools;
 GetOptions(
 		"trim:s"=>\$cut,
@@ -18,6 +18,9 @@ GetOptions(
 		);
 
 die "Error: $samtools not exists!\n" unless -e $samtools;
+if($cut!~/^\d+,\d+$/){
+	die "Error: --trim option should be two numbers separated by a comma, i.e. '6,6'.\n";
+}
 
 if($ARGV[2]!~/\.gz$/){die "$ARGV[2] should be the file.gz format!\n";}
 if($ARGV[0]=~/\.gz$/){
@@ -143,20 +146,28 @@ while(<IN>){
 
 	$offset=$A[3];
 
-#	add for cutoff reads begin
+#	add for trim reads begin
 	my $readLen=length($A[9]);
 	my $qualLen=length($A[10]);
 	if($readLen != $qualLen){next;}
     my ($newStart,$newMatchInfo);
-	($newStart,$newMatchInfo)=&start_MatchInfo($A[3],$A[5],$cut);
 
-    my $read=substr($A[9],$cut,$readLen-2*$cut);
-	my $qual=substr($A[10],$cut,$readLen-2*$cut);
+	my $cutinfo=$cut;
+	if( ($A[1]&16) == 16){
+		my @cut_array=split /,/,$cutinfo;
+		$cutinfo="$cut_array[1],$cut_array[0]";
+	}
+
+	($newStart,$newMatchInfo)=&start_MatchInfo($A[3],$A[5],$cutinfo);
+
+	my ($cut5end,$cut3end)=split /,/,$cutinfo;
+    my $read=substr($A[9],$cut5end,$readLen-$cut5end-$cut3end);
+	my $qual=substr($A[10],$cut5end,$readLen-$cut5end-$cut3end);
 
 	my @seq=split //,$read;
 	my @qual=split //,$qual;
 
-#   add for cutoff reads end
+#   add for trim reads end
 	@M=();
 	@M=$newMatchInfo=~/(\d+[A-Z])/g;
 	my $refPos=$newStart;
@@ -175,8 +186,10 @@ while(<IN>){
 			my $Dqual;
 			for(my $j=0;$j<$M[$i];$j++){$Dqual .= 0;}
 			my $Dseq=substr($genome{$genomeID},$refPos-1,$M[$i]);
-			push ( @{$delete{$A[2]}{$refPos}{Dseq}},$Dseq );
-			push ( @{$delete{$A[2]}{$refPos}{Dqual}},$Dqual );
+			if($M[$i]>0){
+				push ( @{$delete{$A[2]}{$refPos}{Dseq}},$Dseq );
+				push ( @{$delete{$A[2]}{$refPos}{Dqual}},$Dqual );
+			}
 			$refPos+=$M[$i];
 		}elsif($M[$i]=~/I/){
 			$M[$i]=~s/I//;
@@ -186,8 +199,10 @@ while(<IN>){
 				$Iqual .= $qual[$seqPos];
 				$seqPos++;
 			}
-			push ( @{$insert{$A[2]}{$refPos-1}{Iseq}},$Iseq);
-			push ( @{$insert{$A[2]}{$refPos-1}{Iqual}},$Iqual);
+			if($M[$i]>0){
+				push ( @{$insert{$A[2]}{$refPos-1}{Iseq}},$Iseq);
+				push ( @{$insert{$A[2]}{$refPos-1}{Iqual}},$Iqual);
+			}
 		}elsif($M[$i]=~/S/){
 			$M[$i]=~s/S//;
 			$seqPos+=$M[$i];
@@ -231,20 +246,21 @@ sub start_MatchInfo{
 	my $start=shift;
 	my $matchInfo=shift;
 	my $cutlen=shift;
+	my ($cutlen5,$cutlen3)=split /,/,$cutlen;
 	my @M=$matchInfo=~/(\d+[A-Z])/g;
 ##for head
 	my $headcutlen=0;
 	my $offset=0;
 	my $tag;
-	while($headcutlen<$cutlen){
+	while($headcutlen<$cutlen5){
 		my $info=shift @M;
 		if($info=~/M/){
 			$info=~s/M//;
-			if($headcutlen+$info>=$cutlen){
-				my $diff=$info-($cutlen-$headcutlen);
+			if($headcutlen+$info>=$cutlen5){
+				my $diff=$info-($cutlen5-$headcutlen);
 				if($diff>0){$tag="${diff}M";}
-				$offset+=($cutlen-$headcutlen);
-				$headcutlen=$cutlen;
+				$offset+=($cutlen5-$headcutlen);
+				$headcutlen=$cutlen5;
 			}else{
 				$headcutlen+=$info;
 				$offset+=$info;
@@ -254,10 +270,10 @@ sub start_MatchInfo{
 			$offset+=$info;
 		}elsif($info=~/I|S/){
 			$info=~s/I|S//;
-			if($headcutlen+$info>=$cutlen){
-				my $diff=$info-($cutlen-$headcutlen);
+			if($headcutlen+$info>=$cutlen5){
+				my $diff=$info-($cutlen5-$headcutlen);
 				if($diff>0){$tag="${diff}S";}   # "S" for edge
-					$headcutlen=$cutlen;
+					$headcutlen=$cutlen5;
 			}else{
 				$headcutlen+=$info;
 			}
@@ -281,24 +297,24 @@ sub start_MatchInfo{
 #### for tail
 	my $tailcutlen=0;
 	$tag="";
-	while($tailcutlen<$cutlen){
+	while($tailcutlen<$cutlen3){
 		my $info=pop @M;
 		if($info=~/M/){
 			$info=~s/M//;
-			if($tailcutlen+$info>=$cutlen){
-				my $diff=$info-($cutlen-$tailcutlen);
+			if($tailcutlen+$info>=$cutlen3){
+				my $diff=$info-($cutlen3-$tailcutlen);
 				if($diff>0){$tag="${diff}M";}
-				$tailcutlen=$cutlen;
+				$tailcutlen=$cutlen3;
 			}else{
 				$tailcutlen+=$info;
 			}
 		}elsif($info=~/D|N/){
 		}elsif($info=~/I|S/){
 			$info=~s/I|S//;
-			if($tailcutlen+$info>=$cutlen){
-				my $diff=$info-($cutlen-$tailcutlen);
+			if($tailcutlen+$info>=$cutlen3){
+				my $diff=$info-($cutlen3-$tailcutlen);
 				if($diff>0){$tag="${diff}S";}   # "S" for edge
-					$tailcutlen=$cutlen;
+					$tailcutlen=$cutlen3;
 			}else{
 				$tailcutlen+=$info;
 			}

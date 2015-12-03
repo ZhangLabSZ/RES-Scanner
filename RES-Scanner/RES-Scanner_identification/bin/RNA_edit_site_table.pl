@@ -8,26 +8,17 @@ my ($RNA_singleBase,$DNA_singleBase,$DNAdepth,$phred,$qual_cutoff,$RNAdepth,$edi
 
 my $HomoPrior ||= 0.99;
 my $rate ||= 4; #the rate of transition over transversion
-#$DNAdepth ||= 7;
-#$RNAdepth ||= 3;
-$phred ||= 33;
+$phred ||= "33,33";
 $qual_cutoff ||= 30;
-#$editLevel ||= 0.05;
-#$editDepth ||= 3;
 $ploidy ||= 2;
 $method ||= "Bayesian";
 
 GetOptions (
 		"RNA_singleBase:s"=>\$RNA_singleBase,
 		"DNA_singleBase:s"=>\$DNA_singleBase,
-		"RNA_bam:s"=>\$RNA_bam,
 		"genome:s"=>\$genome,
-#		"DNAdepth:s"=>\$DNAdepth,
 		"phred:s"=>\$phred,
 		"qual_cutoff:s"=>\$qual_cutoff,
-#		"RNAdepth:s"=>\$RNAdepth,
-#		"editLevel:s"=>\$editLevel,
-#		"editDepth:s"=>\$editDepth,
 		"strand:s"=>\$strand,
 		"ploidy:s"=>\$ploidy,
 		"samtools:s"=>\$samtools,
@@ -36,15 +27,14 @@ GetOptions (
 		"method:s"=>\$method,
 		);
 
-if (!$RNA_singleBase || !$DNA_singleBase || !$RNA_bam || !$strand || !$samtools ) {
+if (!$RNA_singleBase || !$DNA_singleBase || !$strand || !$samtools ) {
 	print <<"Usage End.";
 Description:
 	This script is used to obtain the homo-site for RNA editing set.
 		--RNA_singleBase    The raw file of RNAedinting_sam2base
 		--DNA_singleBase    The single base file for whole genome.
-		--RNA_bam           The file.bam of RNA-seq data.
 		--genome            The refference genome (Required when --method Bayesian).
-		--phred             ASCII-33 gives the Phred base quality for query QUALity of BAM file. [33]
+		--phred             The Phred base quality for query QUALity of DNA.bam and RNA.bam files respectively, default DNA_ASCII-33,RNA_ASCII-33. [33,33]
 		--qual_cutoff       Quality cutoff for BWA alignment. [30]
 		--strand            The strand of data, '+' or '-' for strand specific data, 'unknown' for non-strand specific data.
 		--ploidy            The ploidy level, 1 for monoploid , 2 for diploid, 3 for triploid, 4 for tetraploid, and so on. [2].
@@ -55,7 +45,7 @@ Description:
 
 
 Example:
-	perl $0 --RNA_singleBase RNA.sam2base --DNA_singleBase DNA.sam2base --RNA_bam RNA.bam --phred 33 --qual_cutoff 30 --strand unknown --ploidy 2 --samtools /abs_path/samtools --method Bayesian --genome genome.fa
+	perl $0 --RNA_singleBase RNA.sam2base --DNA_singleBase DNA.sam2base --phred 33,33 --qual_cutoff 30 --strand unknown --ploidy 2 --samtools /abs_path/samtools --method Bayesian --genome genome.fa
 
 Usage End.
 		exit;
@@ -78,6 +68,8 @@ if($method ne "Bayesian" && $method ne "Binomial" && $method ne "Frequency"){
 }
 
 
+my ($phred_DNA,$phred_RNA)= split /\,/,$phred;
+
 if ($RNA_singleBase =~ /\S+\.gz$/) {
 	open (IN,"gunzip -c $RNA_singleBase |") or die $!;
 } else {
@@ -91,7 +83,7 @@ while (<IN>) {
 	chomp;
 	my @info = split /\s+/;
 #	next unless $info[5] >= $RNAdepth;
-	next unless $info[5] >= 3;   #optional
+	next unless $info[5] >= 2;   #optional
 	die "These bases($info[0]\t$info[1]) doesn't match!\n" unless ($info[3] =~ /^\[M\]:([ATCGNatcgn]+)(;\[I\]:[ATCGNatcgn,]+)?(;\[D\]:[ATCGNatcgn,]+)?/);
 	my @bases = split //,$1;
 	my $number = $#bases+1;
@@ -103,14 +95,14 @@ while (<IN>) {
 	die "Something was wrong at the location[$info[0]\t$info[1]]!\n" unless @bases == @qualities;
 	my (@b_temp,@q_temp);
 	for (my $i=0;$i<@bases;$i++) {
-		my $score = ord($qualities[$i]) - $phred;
-		if ($score >= $qual_cutoff) {
+		my $score = ord($qualities[$i]) - $phred_RNA;
+		if ($score >= $qual_cutoff && $bases[$i] ne "N") {
 			push @b_temp,$bases[$i];
 			push @q_temp,$qualities[$i];
 		}
 	}
 	my $coverage = @b_temp;
-	next unless $coverage >= 3;    #optional
+	next unless $coverage >= 2;    #optional
 	my $Bases = join "","[M]:",@b_temp;
 	my $Quals = join "","[M]:",@q_temp;
 	my %editHash;
@@ -162,7 +154,7 @@ while (<IN>) {
 #	my $coverage = $info[5]; 
 #	next unless $coverage >= $DNAdepth;
 	my $coverage = 0;
-	my ($seq,$qua) = &dealBasequailty(@info);
+	my ($seq,$qua) = &dealBasequailty(@info,$phred_DNA);
 	$seq=uc $seq;
 	if ($seq) {
 		$coverage += length($seq);
@@ -276,6 +268,7 @@ foreach my $chr (sort keys %RNAediting) {
 				push @tag,$stat;
 				$mark ++;
 			}
+			next if $best[0] eq "N";
 
 			if(@tag>2){             # filter multiple editing type
 				my @num_array;
@@ -303,7 +296,7 @@ foreach my $chr (sort keys %RNAediting) {
 			}
 			my $outline;
 #			next if ($best[1] < $editDepth);
-			next if ($best[1] < 3);
+			next if ($best[1] < 2);
 			if($strand eq "+" || $strand eq '-'){
 				$outline = join "\t",@info[0,1],$strand,@info[2,3],$dna_info,$homo_tag,$posterior,$type,$info[6],$rna_info,$best[0],$best[1],$RNA_degree;
 			}else{
@@ -315,99 +308,13 @@ foreach my $chr (sort keys %RNAediting) {
 }
 undef %RNAediting;
 
-my %site_sort;
-my %log_total;
-foreach my $chr (keys %site){
-	my @array=sort {$a<=>$b} keys %{$site{$chr}};
-	@{$site_sort{$chr}}=@array;
-	my $n=@array;
-	$log_total{$chr}=$n;
-}
-
-
-$time= &getTime();
-print STDERR "$time\tCalculating number of RNA reads that supporting RNA editing sites...\n";
-
-
-##
-if($RNA_bam=~/\.bam$/){
-	open IN,"$samtools view $RNA_bam |" or die $!;
-}elsif($RNA_bam=~/\.gz$/){
-	open IN,"gunzip -c $RNA_bam |" or die $!;
-}else{
-	open IN,"$RNA_bam" or die $!;
-}
-while(<IN>){
-	chomp;
-	my @A=split /\t/;
-	my $beg=$A[3];
-	my $end= &offset($A[3],$A[5]);
-	if(exists $site{$A[2]}){
-		my @array= @{$site_sort{$A[2]}};
-		my @next_array=@array;
-		my $len=length($A[9]);
-		my $tailEnd_len=int $len/4;
-		foreach my $pos (@array){
-			if($pos<$beg){
-				shift @next_array;
-			}
-			if($pos>$end || $array[-1]<$beg){last;}
-			if($pos>=$beg && $pos<=$end){
-				my @info_array=split /\t/,$site{$A[2]}{$pos}{info};
-				my $editType=$info_array[11];
-				$editType=uc $editType;
-				my $posOnRead=&locateOnRead($pos-$beg+1,$A[5]);
-				if($posOnRead==0){next;}
-				my $readBase=uc (substr($A[9], $posOnRead-1, 1));
-				my $readQual=substr($A[10],$posOnRead-1,1);
-				if($readBase ne $editType){next;}
-				my $q=ord($readQual)-$phred;
-				if($q<$qual_cutoff){next;}
-				my $flag=1;
-				if(!exists $site{$A[2]}{$pos}{lastBeg} && !exists $site{$A[2]}{$pos}{lastEnd} && !exists $site{$A[2]}{$pos}{lastScaf}){
-				}elsif($site{$A[2]}{$pos}{lastBeg} eq $beg && $site{$A[2]}{$pos}{lastEnd} eq $end && $site{$A[2]}{$pos}{lastScaf} eq $A[2]){
-					$flag=0;
-				}
-				my $beg_len=$posOnRead;
-				my $end_len=$len-$posOnRead;
-				if($beg_len< $tailEnd_len || $end_len< $tailEnd_len){
-					$site{$A[2]}{$pos}{end}++;
-				}else{
-					$site{$A[2]}{$pos}{mid}++;
-				}
-				if($flag){$site{$A[2]}{$pos}{readNum}++;}
-				($site{$A[2]}{$pos}{lastBeg},$site{$A[2]}{$pos}{lastEnd},$site{$A[2]}{$pos}{lastScaf})=($beg,$end,$A[2]);
-			}
-		}
-		@{$site_sort{$A[2]}}=@next_array;
-		my $n=@array;
-		my $next_n=@next_array;
-		my $ratio=sprintf "%.2f",100-$next_n/$log_total{$A[2]}*100;
-		if($next_n<$n){
-#			print STDERR "\t$A[2]: ${ratio}% sites finish. (Total: $log_total{$A[2]})\n";
-			print STDERR "\t$A[2]: ${ratio}% sites finish.\n";
-		}
-	}
-}
-close IN;
-
 my @readInfo_result;
 foreach my $scaf (keys %site){
 	foreach my $pos (keys  %{$site{$scaf}}){
-		if(!exists $site{$scaf}{$pos}{end}){
-			$site{$scaf}{$pos}{end}=0;
-		}
-		if(!exists $site{$scaf}{$pos}{mid}){
-			$site{$scaf}{$pos}{mid}=0;
-		}
-		if(!exists $site{$scaf}{$pos}{readNum}){
-			$site{$scaf}{$pos}{readNum}=0;
-		}
-		my @line=split /\t/,"$site{$scaf}{$pos}{info}\t$site{$scaf}{$pos}{end}\t$site{$scaf}{$pos}{mid}\t$site{$scaf}{$pos}{readNum}";
+		my @line=split /\t/,$site{$scaf}{$pos}{info};
 		push @readInfo_result,[@line];
 	}
 }
-undef %site_sort;
 undef %site;
 my @Parray;
 
@@ -456,11 +363,11 @@ if($method eq "Bayesian"){
 	die "Error: unknown --Method $method\n";
 }
 
-print "1.Chromosome_ID\t2.Coordinate\t3.strand\t4.Ref_base\t5.coverage(DNA)\t6.DNA_BaseCount[A,C,G,T]\t7.$title1\t8.$title2\t9.coverage(RNA)\t10.RNA_BaseCount[A,C,G,T]\t11.RNA_Editing_Type\t12.RNA_Editing_Level\t13.Quadrant1/4_Read_Num(RNA)\t14.Quadrant2/3_Read_Num(RNA)\t15.Read_Type_Num(RNA)\t16.P_value(RNA_editing)\t17.FDR(RNA_editing)\n";
+print "1.Chromosome_ID\t2.Coordinate\t3.strand\t4.Ref_base\t5.coverage(DNA)\t6.DNA_BaseCount[A,C,G,T]\t7.$title1\t8.$title2\t9.coverage(RNA)\t10.RNA_BaseCount[A,C,G,T]\t11.RNA_Editing_Type\t12.RNA_Editing_Level\t13.P_value(RNA_editing)\t14.FDR(RNA_editing)\n";
 
 foreach my $value (@pvalue_result){
-	my ($Chromosome_ID,$Coordinate,$strand,$gbase,$coverage_DNA,$DNA_BaseCount,$label1,$label2,$editType,$coverage_RNA,$RNA_BaseCount,$BestEditBase_RNA,$coverage_BestEditBase,$editing_degree,$badRead,$goodRead,$ReadTypeNum,$Pvalue,$FDR)=@$value;
-	my $line=join("\t",$Chromosome_ID,$Coordinate,$strand,$gbase,$coverage_DNA,$DNA_BaseCount,$label1,$label2,$coverage_RNA,$RNA_BaseCount,$editType,$editing_degree,$badRead,$goodRead,$ReadTypeNum,$Pvalue,$FDR);
+	my ($Chromosome_ID,$Coordinate,$strand,$gbase,$coverage_DNA,$DNA_BaseCount,$label1,$label2,$editType,$coverage_RNA,$RNA_BaseCount,$BestEditBase_RNA,$coverage_BestEditBase,$editing_degree,$Pvalue,$FDR)=@$value;
+	my $line=join("\t",$Chromosome_ID,$Coordinate,$strand,$gbase,$coverage_DNA,$DNA_BaseCount,$label1,$label2,$coverage_RNA,$RNA_BaseCount,$editType,$editing_degree,$Pvalue,$FDR);
 	print "$line\n";
 }
 
@@ -481,6 +388,7 @@ sub dealBasequailty {
 		push @qualities,$aa[$k];
 	}
 	die "Something was wrong at the location[$array[0]\t$array[1]]!\n" unless @bases == @qualities;
+	my $phred=$array[-1];
 	my (@b_temp,@q_temp);
 	for (my $i=0;$i<@bases;$i++) {
 		my $score = ord($qualities[$i]) - $phred;
@@ -497,89 +405,10 @@ sub dealBasequailty {
 
 sub QualityProbability{
 	my$score=shift;
-	my$value=ord($score)-$phred;
+	my$value=ord($score)-$phred_DNA;
 	my$p=10**(0-$value/10);
 #	$p=$p/(1+$p);  # for solexa
 	return($p);
-}
-
-
-sub offset{
-	my $beg=shift;
-	my $matchInfo=shift;
-	my @M=$matchInfo=~/(\d+[A-Z])/g;
-	my $offset=$beg;
-	for(my $i=0;$i<@M;$i++){
-		if($M[$i]=~/M/){
-			$M[$i]=~s/M//;
-			$offset=$offset+$M[$i]-1;
-		}elsif($M[$i]=~/D/){
-			$M[$i]=~s/D//;
-			$offset=$offset+$M[$i]+1;
-		}elsif($M[$i]=~/I/){
-			$offset=$offset+1;
-		}elsif($M[$i]=~/S/){
-			$M[$i]=~s/S//;
-			if($i>0){$offset=$offset+$M[$i];}
-		}elsif($M[$i]=~/N/){
-			$M[$i]=~s/N//;
-			$offset=$offset+$M[$i]+1;
-		}else{
-			die "$matchInfo Error!";
-		}
-	}
-	return $offset;
-}
-
-
-
-sub locateOnRead{
-	my $span2beg=shift;
-	my $matchInfo=shift;
-	my @M=$matchInfo=~/(\d+[A-Z])/g;
-	my $offset=0;
-	my $count=0;
-	while($span2beg>0){
-		if(!@M){return 0;}
-		my $info=shift @M;
-		$count++;
-		if($info=~/M/){
-			$info=~s/M//;
-			if($info>=$span2beg){
-				$offset+=$span2beg;
-				$span2beg=0;
-			}else{
-				$offset+=$info;
-				$span2beg-=$info;
-			}
-		}elsif($info=~/D/){
-			$info=~s/D//;
-			if($info>=$span2beg){
-				return 0;
-			}else{
-				$span2beg-=$info;
-			}
-		}elsif($info=~/I/){
-			$info=~s/I//;
-			$offset+=$info;
-		}elsif($info=~/S/){
-			$info=~s/S//;
-			if($count==1){$offset+=$info;}
-			else{
-				return 0;
-			}
-		}elsif($info=~/N/){
-			$info=~s/N//;
-			if($info>=$span2beg){
-				return 0;
-			}else{
-				$span2beg-=$info;
-			}
-		}else{
-			die "$matchInfo Error!";
-		}
-	}
-	return $offset;
 }
 
 sub Fdr{

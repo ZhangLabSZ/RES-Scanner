@@ -4,7 +4,7 @@ use Getopt::Long;
 use FindBin qw($Bin $Script);
 use File::Basename qw(basename dirname);
 use Cwd 'abs_path';
-my ($outdir, $ref, $help, $config, $n, $bwa, $samtools, $k, $l, $t, $index);
+my ($outdir, $ref, $help, $config, $n, $bwa, $samtools, $k, $l, $t, $index, $run, $junction);
 $outdir ||= "./";
 $n ||= 0.08;
 $k ||= 3;
@@ -22,9 +22,11 @@ GetOptions(
 		"l:s"=>\$l,
 		"bwa:s"=>\$bwa,
 		"samtools:s"=>\$samtools,
+		"junction:s"=>\$junction,
+		"run"=>\$run,
 		"help"=>\$help,
 		);
-if (!defined $ref || !defined $outdir || !defined $bwa || !defined $config || $help) {
+if (!defined $ref || !defined $outdir || !defined $bwa || !defined $config || $help || !defined $samtools) {
 	print <<"Usage End."; 
 
 Description:
@@ -43,6 +45,8 @@ Options:
 	--bwa        FILE   The absolute path of BWA software pre-installed in local machine.
 	--samtools   FILE   The absolute path of SAMtools software pre-installed in local machine.
 	--index      NUM    The reference genome is indexed in part1 or not, '1' for yes, '0' for not, default yes. [1]
+	--junction   FILE   The file of junction information with POS format. Force --index. [null]
+	--run               Run the jobs directly with serial working mode.
 	--help              Show the help information.
 
 Usage:
@@ -71,8 +75,8 @@ if($index){
 	}
 }
 
-
-foreach my $script ($bwa, $samtools) {
+my $convert_BAM_coordinate4junction="$Bin/bin/convert_BAM_coordinate4junction.pl";
+foreach my $script ($bwa, $samtools, $convert_BAM_coordinate4junction) {
 	die "$script is not existent!" unless -e $script;
 }
 
@@ -173,6 +177,14 @@ foreach my $tag (keys %bam_hash){
 	}else{
 		die "Error: no bam files to be processed";
 	}
+	if(defined $junction){
+		print OUT "if [ ! -f \"$outdir/index/junctionFlankSequenceRegion.txt\" ];then echo \"Warning: $outdir/index/junctionFlankSequenceRegion.txt is not existent when --junction is activated\"\nexit 0\nfi\n";
+		print OUT "perl $convert_BAM_coordinate4junction $outdir/index/junctionFlankSequenceRegion.txt $dir/$lib.merge.bam $dir/$lib.merge.converted.bam $samtools\n";
+		print OUT "$samtools sort $dir/$lib.merge.converted.bam $dir/$lib.merge.converted.sort\n";
+		print OUT "mv -f $dir/$lib.merge.bam $dir/$lib.merge.unconverted.bam\n";
+		print OUT "rm -f $dir/$lib.merge.converted.bam\n";
+		print OUT "mv -f $dir/$lib.merge.converted.sort.bam $dir/$lib.merge.bam\n";
+	}
 	print OUT "echo Merging BAM files of $tag $lib is completed ! > $dir/mergeBam.$lib.log\n";
 	print OUT "echo '$dir/$lib.merge.bam' is the final mapping result of $tag $lib. > $dir/mergeBam.$lib.log\n";
 	print OUT "echo Merging BAM files of $tag $lib is completed !\n";
@@ -187,24 +199,33 @@ foreach my $tag (keys %bam_hash){
 
 open OUT,">$outdir/RES_Scanner_indentification_config.txt" or die $!;
 foreach my $sample (sort keys %config_hash){
+	my $flag=1;
 	if(!exists $config_hash{$sample}{DNA}){
-		die "Warning: DNA-Seq data for $sample is not existent!\n";
+		print STDERR "Warning: DNA-Seq data for $sample is not existent!\n";
+		$flag=0;
 	}
 	if(!exists $config_hash{$sample}{RNA}){
-		die "Warning: RNA-Seq data for $sample is not existent!\n";
+		print STDERR "Warning: RNA-Seq data for $sample is not existent!\n";
+		$flag=0;
 	}
-	print OUT "$sample\t$config_hash{$sample}{DNA}\t$config_hash{$sample}{RNA}\n";
+	if($flag){
+		print OUT "$sample\t$config_hash{$sample}{DNA}\t$config_hash{$sample}{RNA}\n";
+	}
 }
 close OUT;
 
 ###  Usage notice  ###
+if($run){
+	system "sh $outdir/step2.sh";
+	system "sh $outdir/step3.sh";
+}else{
 	print STDERR "*****************************************************************************************************************************\n";
 	print STDERR "There are two shell scripts to be finished, users have to run the jobs step by step, before going ahead to the next step, please make sure the current job is finished successfully. If one step contains multiple shell scripts, users can run these scripts in parallel.\n";
 	print STDERR "Please run step2 with command 'sh $outdir/step2.sh' or by submitting it to computing servers.\n";
 	print STDERR "Please run step3 with command 'sh $outdir/step3.sh' or by submitting it to computing servers.\n";
 	print STDERR "After all the jobs are completed, the file named 'RES_Scanner_indentification_config.txt' in the output directory can be the configuration file for RES_Scanner_indentification pipeline\n";
 	print STDERR "*****************************************************************************************************************************\n";
-
+}
 ################ subrouting ###############
 sub checkQuality {
 	my $file=shift;

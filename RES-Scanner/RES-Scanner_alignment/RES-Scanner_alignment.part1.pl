@@ -4,17 +4,20 @@ use Getopt::Long;
 use FindBin qw($Bin $Script);
 use File::Basename qw(basename dirname);
 use Cwd 'abs_path';
-my ($outdir, $ref, $help, $index, $config, $split, $bwa);
+my ($outdir, $ref, $help, $index, $config, $split, $bwa, $junction, $run, $readlen);
 $outdir ||= "./";
 $index ||= 1;
 
 GetOptions(
 		"outDir:s"=>\$outdir,
 		"ref:s"=>\$ref,
+		"junction:s"=>\$junction,
+		"readlen:s"=>\$readlen,
 		"index:s"=>\$index,
 		"config:s"=>\$config,
 		"split"=>\$split,
 		"bwa:s"=>\$bwa,
+		"run"=>\$run,
 		"help"=>\$help,
 		);
 if (!defined $ref || !defined $outdir || !defined $bwa || !defined $config || $help) {
@@ -29,6 +32,8 @@ options:
 	--ref       FILE    The reference genome in FASTA format.
 	--outDir    STR     The output directory, default="./"
 	--index	    NUM     Index the reference genome for BWA or not, '1' for yes, '0' for no, default yes. [1]
+	--junction  FILE    The file of junction information with POS format. Force --index. (Note: The length of all RNA-seq reads should keep the same.) [null]
+	--readlen   INT     The length (bp) of RNA-seq reads for --junction option.[null]
 	--bwa       FILE    The absolute path of BWA software pre-installed in local machine.
 	--config    FILE    The configuration file that contains the information of DNA-Seq and RNA-Seq data.
 	                    Format of configuration file (tab-delimited table): 
@@ -38,8 +43,9 @@ options:
 	                       4) Insert size
 	                       5) 1.fastq file
 	                       6) 2.fastq file (Note: the sixth column can be absent for single-end data).
-	--split            Split fastq files for multithreading. [null]
-	--help             Show the help information.
+	--split             Split fastq files for multithreading. [null]
+	--run               Run the jobs directly with serial working mode.
+	--help              Show the help information.
 
 Usage:
 	perl $0 --outDir ./outdir/ --ref reference.fa --bwa /path_to_bwa/bwa --index 1 --config config.file --split
@@ -52,8 +58,11 @@ Usage End.
 		exit;
 }
 #################################################################################################################
-my $Split_Fq="$Bin/Split_Fq.pl";
-die "$Split_Fq not exist!\n" unless -e $Split_Fq;
+my $Split_Fq="$Bin/bin/Split_Fq.pl";
+my $junction2flankSequenceRegion="$Bin/bin/junction2flankSequenceRegion.pl";
+my $flankSequenceRegion2fa="$Bin/bin/flankSequenceRegion2fa.pl";
+die "$Split_Fq is not existent!\n" unless -e $Split_Fq;
+die "$junction2flankSequenceRegion is not existent!\n" unless -e $junction2flankSequenceRegion;
 
 mkdir $outdir unless -e $outdir;
 $outdir=abs_path $outdir;
@@ -91,25 +100,78 @@ foreach my $lane (keys %checkLane){
 my $pair_flag=0;
 foreach my $sample (sort keys %pair){
 	if(!exists $pair{$sample}{'DNA'}){
-		print STDERR "Error: There is no matched DNA-Seq data for sample '$sample' in configure file $config!\n";
+		print STDERR "Warning: There is no matched DNA-Seq data for sample '$sample' in configure file $config!\n";
 		$pair_flag=1;
 	}
 	if(!exists $pair{$sample}{'RNA'}){
-		print STDERR "Error: There is no matched RNA-Seq data for sample '$sample' in configure file $config!\n";
+		print STDERR "Warning: There is no matched RNA-Seq data for sample '$sample' in configure file $config!\n";
 		$pair_flag=1;
 	}
 }
-if($pair_flag){
-	die "Error: The configure file $config should be revised with matched DNA-Seq and RNA-Seq data for each sample name.\n";
-}
+#if($pair_flag){
+#	die "Error: The configure file $config should be revised with matched DNA-Seq and RNA-Seq data for each sample name.\n";
+#}
 
 
 ## index reference
 if($index){
 	my $index_outdir= "$outdir/index";
 	mkdir $index_outdir unless -e $index_outdir;
+	my $refname=basename $ref;
+	my $junctionCount=0;
+	my $readLength=0;
+	open OUT,">$outdir/step0.sh" or die $!;
+	## add junction sequence
+	if($junction){
+		die "Error: $junction is not existent!\n" unless -e $junction;
+		$junction=abs_path $junction;
+		
+		open JUN,"$junction" or die $!;
+		while(<JUN>){
+			$junctionCount++;
+		}
+		close JUN;
 
-	my $refLength=0;
+		if(defined $readlen){
+			$readLength=$readlen;
+		}else{
+		my $readCount=0;
+		my $totalLength=0;
+		open IN,"$config" or die $!;
+		while(<IN>){
+			chomp;
+			my @A=split /\s+/,$_;
+			if($A[0] eq "RNA"){
+				if($A[4]=~/\.gz$/){
+					open INN,"gunzip -c $A[4] |" or die $!;
+				}else{
+					open INN,"$A[4]" or die $!;
+				}
+				while(<INN>){
+					my $r=<INN>;
+					chomp $r;
+					$totalLength+=length($r);
+					<INN>;
+					<INN>;
+					$readCount++;
+					last if $readCount>=100;
+				}
+				close INN;
+				last;
+			}
+		}	
+		close IN;
+		$readLength=$totalLength/$readCount;
+		}
+		print OUT "perl $junction2flankSequenceRegion $ref $junction $readLength > $index_outdir/junctionFlankSequenceRegion.txt\n";
+		print OUT "perl $flankSequenceRegion2fa $ref $index_outdir/junctionFlankSequenceRegion.txt > $index_outdir/junctionFlankSequenceRegion.fa\n";
+		print OUT "cat $ref $index_outdir/junctionFlankSequenceRegion.fa > $index_outdir/$refname\n";
+	}else{
+		print OUT "ln -s $ref $index_outdir/$refname\n";
+	}
+
+	##
+	my $refLength=$junctionCount*($readLength-1)*2;
 	if($ref=~/\.gz$/){
 		open IN,"gunzip -c $ref |" or die $!;
 	}else{
@@ -127,12 +189,12 @@ if($index){
 	}else{
 		$a_parameter="is";
 	}
-	my $refname=basename $ref;
-	open OUT,">$outdir/step0.sh" or die $!;
-	print OUT "ln -s $ref $index_outdir/$refname\n";
 	print OUT "$bwa index -a $a_parameter $index_outdir/$refname 2>$index_outdir/$refname.log\n";
 	print OUT "echo 'indexing of reference (step0) is completed!' > $outdir/step0.log\n";
 	print OUT "echo 'indexing of reference (step0) is completed!'\n";
+	if($junction){
+		print OUT "echo '$index_outdir/$refname' is the file of assembly plus exonic sequences surrounding all provided splicing junctions\n";
+	}
 	close OUT;
 
 }else{
@@ -198,16 +260,22 @@ while(<IN>){
 close IN;
 
 ############################ help information  ########################
-if($index){
-	print STDERR "*****************************************************************************************************************************\n";
-	print STDERR "There are two shell scripts to be finished, users have to run the jobs step by step, before going ahead to the next step, please make sure the current job is finished successfully. If one step contains multiple shell scripts, users can run these scripts in parallel.\n";
-	print STDERR "Please run step0 with command 'sh $outdir/step0.sh' or by submitting it to computing servers.\n";
-	print STDERR "Please run step1 with command 'sh $outdir/step1.sh' or by submitting it to computing servers.\n";
-	print STDERR "*****************************************************************************************************************************\n";
+if($run){
+	if($index){
+		system "sh $outdir/step0.sh";
+	}
+	system "sh $outdir/step1.sh";
 }else{
-	print STDERR "*****************************************************************************************************************************\n";
-	print STDERR "There are one shell script to be finished, before going ahead to the next part, please make sure the current job is finished successfully. If the step contains multiple shell scripts, users can run these scripts in parallel.\n";
-	print STDERR "Please run step1 with command 'sh $outdir/step1.sh' or by submitting it to computing servers.\n";
-	print STDERR "*****************************************************************************************************************************\n";
+	if($index){
+		print STDERR "*****************************************************************************************************************************\n";
+		print STDERR "There are two shell scripts to be finished, users have to run the jobs step by step, before going ahead to the next step, please make sure the current job is finished successfully. If one step contains multiple shell scripts, users can run these scripts in parallel.\n";
+		print STDERR "Please run step0 with command 'sh $outdir/step0.sh' or by submitting it to computing servers.\n";
+		print STDERR "Please run step1 with command 'sh $outdir/step1.sh' or by submitting it to computing servers.\n";
+		print STDERR "*****************************************************************************************************************************\n";
+	}else{
+		print STDERR "*****************************************************************************************************************************\n";
+		print STDERR "There are one shell script to be finished, before going ahead to the next part, please make sure the current job is finished successfully. If the step contains multiple shell scripts, users can run these scripts in parallel.\n";
+		print STDERR "Please run step1 with command 'sh $outdir/step1.sh' or by submitting it to computing servers.\n";
+		print STDERR "*****************************************************************************************************************************\n";
+	}
 }
-

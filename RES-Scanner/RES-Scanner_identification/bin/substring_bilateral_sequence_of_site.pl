@@ -2,7 +2,7 @@
 use strict;
 use Getopt::Long;
 die "<RES_final_result.txt> <genome.fa>\n" unless @ARGV==2;
-my $extend ||= 100;
+my $extend ||= 50;
 GetOptions(
 		"extend:s"=>\$extend,
 		);

@@ -13,7 +13,7 @@ my $RNAdepth ||= 3;
 my $Bayesian_Posterior_Probability ||= 0.95;
 my $FDR_DNA_Heterozygosis ||= 0.05;
 my $Non_Ref_BaseCount ||= 0;
-$phred ||= 33;
+$phred ||= "33,33";
 $qual_cutoff ||= 30;
 my $intronic ||=6;
 $paralogous_D ||=0;
@@ -45,7 +45,7 @@ Description:
 		--config FILE       The tab-delimited configuration table which contains two columns each line:   
 		                    column 1: sample name that used for REseeker pipeline.
 		                    column 2: output directory of REscanner pipeline of the corresponding sample.
-		--phred             ASCII-33 gives the Phred base quality for query QUALity of BAM file. [33]
+		--phred             The Phred base quality for query QUALity of DNA.bam and RNA.bam files respectively, default DNA_ASCII-33,RNA_ASCII-33. [33,33]
 		--qual_cutoff       Quality cutoff for BWA alignment. [30]
 		--method            Method for detecting SNPs.'Bayesian' or 'Binomial' or 'Frequency'. [Bayesian]
 		--HomoPrior         The prior probability of homozygous genomic positions. (force --method Bayesian) [0.99]
@@ -76,6 +76,7 @@ if($method ne "Bayesian" && $method ne "Binomial" && $method ne "Frequency"){
 my $HetePrior = 1-$HomoPrior;
 my %hash;
 my @order;
+my ($phred_DNA,$phred_RNA)=split /,/,$phred;
 open IN,"$config" or die $!;
 while(<IN>){
 	chomp;
@@ -162,7 +163,7 @@ foreach my $sample (keys %hash){
 		}else{
 			$table{$key1}{$key4}=$A[6];
 		}
-		$table{$key1}{$key5}=$A[15];
+		$table{$key1}{$key5}=$A[12];
 		if(!exists $table{$key1}{gbase}){$table{$key1}{gbase}=uc $A[3];}
 		if(!exists $table{$key1}{type}){
 			$table{$key1}{type}= $A[10];
@@ -201,7 +202,7 @@ foreach my $sample (keys %hash){
 			}else{
 				$table{$key1}{$key4}=$A[6];
 			}
-			$table{$key1}{$key5}=$A[15];
+			$table{$key1}{$key5}=$A[12];
 			if(!exists $table{$key1}{gbase}){$table{$key1}{gbase}= uc $A[3];}
 			if(!exists $table{$key1}{type}){
 				$table{$key1}{type}= $A[10];
@@ -315,7 +316,7 @@ foreach my $sample (keys %hash){
 						$table{$key1}{$key_SNPvalue}="NA";
 						$table{$key1}{$key2}="0,0,0,0";
 					}else{
-						my ($dna_info,$seq,$qua) = &dealCoverage(@A);
+						my ($dna_info,$seq,$qua) = &dealCoverage(@A,$phred_DNA);
 						$table{$key1}{$key2}=$dna_info;
 						my @result;
 						if($method eq "Bayesian"){
@@ -351,7 +352,7 @@ foreach my $sample (keys %hash){
 						$table{$key1}{$key_RNA}="0,0,0,0";
 						$table{$key1}{$key_Editvalue}="1";
 					}else{
-						my ($rna_info,$seq,$qua) = &dealCoverage(@A);
+						my ($rna_info,$seq,$qua) = &dealCoverage(@A,$phred_RNA);
 						$table{$key1}{$key_RNA}=$rna_info;
 						$table{$key1}{$key_Editvalue}=&edit_Pvalue($ref_base,$rna_info,$errorRate);
 					}
@@ -376,7 +377,7 @@ foreach my $sample (keys %hash){
 						$table{$key1}{$key_RNA}="0,0,0,0";
 						$table{$key1}{$key_Editvalue}="1";
 					}else{
-						my ($rna_info,$seq,$qua) = &dealCoverage(@A);
+						my ($rna_info,$seq,$qua) = &dealCoverage(@A,$phred_RNA);
 						$table{$key1}{$key_RNA}=$rna_info;
 						$table{$key1}{$key_Editvalue}=&edit_Pvalue($ref_base,$rna_info,$errorRate);
 					}
@@ -577,6 +578,7 @@ sub dealCoverage {
 		push @qualities,$aa[$k];
 	}
 	die "Something was wrong at the location[$array[0]\t$array[1]]!\n" unless @bases == @qualities;
+	my $phred=$array[-1];
 	my (@b_temp,@q_temp);
 	for (my $i=0;$i<@bases;$i++) {
 		my $score = ord($qualities[$i]) - $phred;
@@ -718,7 +720,7 @@ sub SNPvalue_Bayesian{
 
 sub QualityProbability{
 	my$score=shift;
-	my$value=ord($score)-$phred;
+	my$value=ord($score)-$phred_DNA;
 	my$p=10**(0-$value/10);
 #       $p=$p/(1+$p);  # for solexa
 	return($p);
@@ -804,29 +806,6 @@ sub SNPvalue_Frequency{
 	return ($diffDep,$ratio);
 }
 
-sub dealBasequailty {
-	my @array = @_;
-	die "These bases($array[0]\t$array[1]) doesn't match!\n" unless ($array[3] =~ /^\[M\]:([ATCGNatcgn0]+)(;\[I\]:[ATCGNatcgn,]+)?(;\[D\]:[ATCGNatcgn,]+)?/);
-	my @bases = split //,$1;
-	my $number = $#bases+1;
-	my @qualities;
-	my @aa = split //,$array[4];
-	for (my $k=4;$k<$number+4;$k++) {
-		push @qualities,$aa[$k];
-	}
-	die "Something was wrong at the location[$array[0]\t$array[1]]!\n" unless @bases == @qualities;
-	my (@b_temp,@q_temp);
-	for (my $i=0;$i<@bases;$i++) {
-		my $score = ord($qualities[$i]) - $phred;
-		if ($score >= $qual_cutoff) {
-			push @b_temp,$bases[$i];
-			push @q_temp,$qualities[$i];
-		}
-	}
-	my $b_temp = join "",@b_temp;
-	my $q_temp = join "",@q_temp;
-	return ($b_temp,$q_temp);
-}
 
 sub Fdr{
 	my $p=shift;

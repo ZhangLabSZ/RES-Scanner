@@ -14,8 +14,8 @@ for (my $i=0;$i<5;$i++) {
 while (<IN>) {
 	my @info = split /\s+/;
 	my @query = split /;/,$info[9];
-	if(@query!=2){die "Error: ID contatins semicolon ';' !\n";}
-	my ($scaffold,$st,$ed,$cigar,$strand,$mismatch) = split /:/,$query[1];
+	if(@query!=7){die "Error: ID contatins semicolon ';' !\n";}
+	my ($scaffold,$st,$ed,$cigar,$strand,$mismatch) = @query[1..6];
 	next unless $info[0]>=($ed-$st+1)*0.9;
 	my $head = $st-1;
 	my $tail = $ed;

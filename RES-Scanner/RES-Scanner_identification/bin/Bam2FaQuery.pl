@@ -45,45 +45,37 @@ sub dealSam {
 	}
 	while (<IN>) {
 		my @info = split /\s+/;
-		my $mismath;
-#		next unless ($info[5] =~ /D|I/);
-		for (my $o=11;$o<=$#info;$o++) {
-			next unless ($info[$o] =~ /NM:i:(\d+)$/);
-			$mismath = $1;
-		}
+		next unless $_=~/NM:i:(\d+)/;
+		my $mismath=$1;
 
 		my $info_fq = &dealFq($info[0],$info[1]);
 		my $info_strand = &dealStrand($info[0],$info[1]);
 		my $start = $info[3];
 		my $end = &getAlignment($start,$info[5]);
-		my $tail = join ":",$info[2],$start,$end,$info[5],$info_strand,$mismath;
+		my $tail = join ";",$info[2],$start,$end,$info[5],$info_strand,$mismath;
 
 		if($ss){
 		if ($strand eq "-") {
 			unless ( ( ($info_fq == 1) && ($info_strand eq "+") )  || ( ($info_fq == 2) && ($info_strand eq "-") ) ) {
-				die "This($info[0]\t$info[1]\t) is wrong!\n";
+				die "Error: This($info[0]\t$info[1]\t) is wrong!";
 			}
 		} else {
 			unless ( ( ($info_fq == 1) && ($info_strand eq "-") )  || ( ($info_fq == 2) && ($info_strand eq "+") ) ) {
-				die "Hey!This($info[0]\t$info[1]\t) is wrong!\n";
+				die "Error: This($info[0]\t$info[1]\t) is wrong!";
 			}
 		}
 		}
 
-#		if ($mismath == 0) {
-#			next;
-#		} else {
-			my $li = join "\/",$info[0],$info_fq;
-			my $lin = join ";",$li,$tail;
-			my $line = join "",">",$lin;
-			print OT "$line\n";
-			my $sequnce=$info[9];
-			if($info_strand eq "-"){
-				$sequnce=reverse $info[9];
-				$sequnce=~tr/ATCGNatcgn/TAGCNtagcn/;
-			}
-			print OT "$sequnce\n";
-#		}
+		my $li = join "\/",$info[0],$info_fq;
+		my $lin = join ";",$li,$tail;
+		my $line = join "",">",$lin;
+		print OT "$line\n";
+		my $sequnce=$info[9];
+		if($info_strand eq "-"){
+			$sequnce=reverse $info[9];
+			$sequnce=~tr/ATCGNatcgn/TAGCNtagcn/;
+		}
+		print OT "$sequnce\n";
 	}
 	close IN;
 }

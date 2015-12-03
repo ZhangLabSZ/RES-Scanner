@@ -3,19 +3,22 @@ use strict;
 use Cwd 'abs_path';
 use File::Basename qw(basename);
 use Getopt::Long;
-die "<bam> <outdir> <samtools> --mis [int(readLength*0.06)] --ss [1|0] --mq [20] --soft [0|1]\n" unless @ARGV>=3;
-my ($mis,$ss,$mq,$soft);
+die "<bam> <outdir> <samtools> --ss [1|0] --mq [20] --rmdup [1|0] --DNA|--RNA  --uniqTag [0|1]\n" unless @ARGV>=4;
+my ($ss,$mq,$rmdup,$DNA,$RNA,$uniqTag);
 $ss ||= 1;
 $mq ||= 20;
-$soft ||= 0;
+$uniqTag ||= 0;
+$rmdup ||= 1;
 my $samtools=$ARGV[2];
 die "$samtools does not exists!\n" unless -e $samtools;
 
 GetOptions(
-		"mis:s"=>\$mis,
 		"ss:s"=>\$ss,
 		"mq:s"=>\$mq,
-		"soft:s"=>\$soft,
+		"rmdup:s"=>\$rmdup,
+		"DNA"=>\$DNA,
+		"RNA"=>\$RNA,
+		"uniqTag:s"=>\$uniqTag,
 		);
 
 if($ARGV[0]=~/\.sam.gz$/){
@@ -29,6 +32,9 @@ if($ARGV[0]=~/\.sam.gz$/){
 }
 my $outdir = abs_path($ARGV[1]);
 my $filename= basename($ARGV[0]);
+if($DNA){
+	$ss=0;
+}
 
 if($ss){
 	open OUT1,"| $samtools view -hbS - >$outdir/$filename.negative.bam" or die $!;
@@ -37,61 +43,59 @@ if($ss){
 	open OUT3,"| $samtools view -hbS - >$outdir/$filename.best.bam" or die $!;
 }
 
-	while(<IN>){
-		chomp;
-		my @array4tile=split /\t/;
-		if(@array4tile<9){
-			if($ss){
-				print OUT1 "$_\n";
-				print OUT2 "$_\n";
-			}else{
-				print OUT3 "$_\n";
-			}
+while(<IN>){
+	chomp;
+	my @array4tile=split /\t/;
+	if(@array4tile<9){
+		if($ss){
+			print OUT1 "$_\n";
+			print OUT2 "$_\n";
+		}else{
+			print OUT3 "$_\n";
+		}
+		next;
+	}
+
+	my @A=split /\t/;
+	if($A[4]<$mq){next;}
+	my $flag=$A[1];
+	my %hash;
+	&index($flag,\%hash);
+	if(exists $hash{1024} && $rmdup){next;}
+	if($RNA){
+        if( $uniqTag && ($_!~/XT:A:U\s+/ || $_!~/X0:i:1\s+/ || $_!~/X1:i:0\s+/) ){
 			next;
 		}
-		
-		if( $_=~/XT:A:U\s+/ && $_=~/X0:i:1\s+/ && $_=~/X1:i:0\s+/ ){
-			my @A=split /\t/;
-			if($A[4]<$mq){next;}
-			if($soft eq "1"){
-				if($A[5]=~/D|I|S/){next;}
-			}else{
-				if($A[5]=~/D|I/){next;}                       ##### optional  
+		if(exists $hash{256}){next;}
+		if($flag eq 67 || $flag eq 131 || $flag eq 115 || $flag eq 179){next;}
+		if(exists $hash{32} && exists $hash{16}){next;}
+		if($ss){
+			if(  exists $hash{64}  && exists $hash{32} && $A[8]>=0  ){
+				print OUT1 "$_\n";
+			}elsif( exists $hash{128}  && exists $hash{16} && $A[8]<=0 ){
+				print OUT1 "$_\n";
+			}elsif( exists $hash{64}  && exists $hash{16} && $A[8]<=0 ){
+				print OUT2 "$_\n";
+			}elsif( exists $hash{128}  && exists $hash{32} && $A[8]>=0){
+				print OUT2 "$_\n";
+			}elsif(exists $hash{64} && !exists $hash{16} && !exists $hash{32}){
+				print OUT1 "$_\n";
+			}elsif( exists $hash{128} && !exists $hash{16} && !exists $hash{32}){
+				print OUT2 "$_\n";
+			}elsif ($flag==16){
+				print OUT2 "$_\n";
+			}elsif ($flag==0){
+				print OUT1 "$_\n";
 			}
-			my ($missmatch)=$_=~/NM:i:(\d+)\s+/;
-			my $seqLen=length($A[9]);
-			if(!defined $mis){
-				$mis=int $seqLen*0.06;
-			}
-			my $Tlen= $A[8] <0 ? -1*$A[8] : $A[8];
-			if($missmatch>$mis || $Tlen>5000){next;}
-			my $flag=$A[1];
-			my %hash;
-			&index($flag,\%hash);
-			if(exists $hash{32} && exists $hash{16}){next;}
-			if($ss){
-				if(  exists $hash{64}  && exists $hash{32} && $A[8]>0  ){
-					print OUT1 "$_\n";
-				}elsif( exists $hash{128}  && exists $hash{16} && $A[8]<0 ){
-					print OUT1 "$_\n";
-				}elsif( exists $hash{64}  && exists $hash{16} && $A[8]<0 ){
-					print OUT2 "$_\n";
-				}elsif( exists $hash{128}  && exists $hash{32} && $A[8]>0){
-					print OUT2 "$_\n";
-				}elsif(exists $hash{64} && !exists $hash{16} && !exists $hash{32}){
-					print OUT1 "$_\n";
-				}elsif( exists $hash{128} && !exists $hash{16} && !exists $hash{32}){
-					print OUT2 "$_\n";
-				}elsif ($flag==16){
-					print OUT2 "$_\n";
-				}elsif ($flag==0){
-					print OUT1 "$_\n";
-				}
-			}else{
-				print OUT3 "$_\n";
-			}
+		}else{
+			print OUT3 "$_\n";
 		}
+	}elsif($DNA){
+		print OUT3 "$_\n";
+	}else{
+		die "Error: option --DNA or --RNA is not activated!\n";
 	}
+}
 close IN;
 if($ss){
 	close OUT1;
