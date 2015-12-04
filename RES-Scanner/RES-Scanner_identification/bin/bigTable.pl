@@ -16,8 +16,8 @@ my $Non_Ref_BaseCount ||= 0;
 $phred ||= "33,33";
 $qual_cutoff ||= 30;
 my $intronic ||=6;
-$paralogous_D ||=0;
-$homopolymer ||=0;
+$paralogous_D ||=1;
+$homopolymer ||=1;
 
 GetOptions(
 		"config:s"=>\$config,
@@ -59,9 +59,9 @@ Description:
 		--intronic     NUM  Remove intronic candidate editing sites occurring within (the number of) bases of a splice site. [6]
 		--DNAdepth          Coverage of DNA base, the site which is less than the coverage will not be marked as edit site in corresponding sample. [default 10]
 		--RNAdepth          Coverage of RNA base, the site which is less than the coverage will not be marked as edit site in corresponding sample. [default 3]
-		--homopolymer  NUM  Whether remove candidate editing sites in homopolymer runs of >= 5 base pairs. 1 for yes, 0 for not. [default 0]
+		--homopolymer  NUM  Whether remove candidate editing sites in homopolymer runs of >= 5 base pairs. 1 for yes, 0 for not. [default 1]
 		--paralogous_D NUM  Whether discard candidate editing sites with DNA reads depth of more than twice the genome-wide peak or mean depth. 
-		                    1 for yes, 0 for not. [default 0]
+		                    1 for yes, 0 for not. [default 1]
 
 		Example:		
 		perl $0  --config <config.file> --genome genome.fa  

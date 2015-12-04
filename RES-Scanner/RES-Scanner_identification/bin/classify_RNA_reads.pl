@@ -10,7 +10,7 @@ my $readType ||= 3;
 my $phred ||= "33,33";
 my $qual_cutoff ||= 30;
 my $cut ||= "6,6";
-my $paralogous_R ||= 0;
+my $paralogous_R ||= 1;
 my $refined ||= 1;
 
 GetOptions (
@@ -42,7 +42,7 @@ Options:
 		--qual_cutoff   NUM     Quality cutoff for BWA alignment. [30]
 		--trim          INT     The number of bases solf-clipped at "5'end,3'end" of a read. [6,6]
 		--paralogous_R  NUM     Remove candidate editing sites from those regions that are similar to other parts of the genome
-		                        by BLAT alignment. 1 for yes, 0 for not. Note: force --blat. [0]
+		                        by BLAT alignment. 1 for yes, 0 for not. Note: force --blat. [1]
 		--outdir        STR     Output directory.
 
 		Example:

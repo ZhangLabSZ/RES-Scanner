@@ -7,7 +7,7 @@ die "<bam> <outdir> <samtools> --ss [1|0] --mq [20] --rmdup [1|0] --DNA|--RNA  -
 my ($ss,$mq,$rmdup,$DNA,$RNA,$uniqTag);
 $ss ||= 1;
 $mq ||= 20;
-$uniqTag ||= 0;
+$uniqTag ||= 1;
 $rmdup ||= 1;
 my $samtools=$ARGV[2];
 die "$samtools does not exists!\n" unless -e $samtools;
