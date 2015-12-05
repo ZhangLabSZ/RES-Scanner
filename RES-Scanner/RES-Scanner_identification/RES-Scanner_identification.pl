@@ -1,3 +1,13 @@
+#RES-Scanner -- RNA Editing Sites Scanner, a flexible and efficient software package that detects and annotates genome-wide RNA-editing sites using matched RNA-Seq and DNA-Seq data from the same individuals or samples.
+#Copyright (C) 2015 China National GeneBank 
+#Zongji Wang <wangzongji@genomics.cn>
+#Jinmin Lian <lianjinmin@genomics.cn> 
+#Qiye Li <liqiye@genomics.cn> 
+#Pei Zhang <zhangpei@genomics.cn>
+#RES-Scanner is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. 
+#RES-Scanner is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. 
+#You should have received a copy of the GNU General Public License along with this program. If not, see <http://www.gnu.org/licenses/>. 
+
 #!/usr/bin/perl -w 
 use strict;
 use Cwd 'abs_path';
@@ -185,14 +195,13 @@ my $filter_edit_site_table = "$Bin/bin/filter_edit_site_table.pl";
 my $bigTable = "$Bin/bin/bigTable.pl";
 my $GetCodonInf = "$Bin/bin/GetCodonInf.pl";
 my $Amino_acid_change = "$Bin/bin/Amino_acid_change.pl";
-my $substring_bilateral_sequence_of_site = "$Bin/bin/substring_bilateral_sequence_of_site.pl";
 my $filter_sites_in_paralogous_regions = "$Bin/bin/filter_sites_in_paralogous_regions.pl";
 my $filter_knownSNPs = "$Bin/bin/filter_knownSNPs.pl";
 my $remove_conflict_editType = "$Bin/bin/remove_conflict_editType.pl";
 my $src_utils_pslScore_pslScore = "$Bin/bin/src_utils_pslScore_pslScore.pl";
 my $pslScore2editSite = "$Bin/bin/pslScore2editSite.pl";
 
-foreach my $perl_script ($bestUniq,$sam2base,$GetAlignmentErrorsID,$filter_abnormal_alignment_forBWA,$Bam2FaQuery,$sam2base_statistic,$RNA_edit_site_table,$type2pos,$findOverlap,$addFeature2RNAediting,$filter_edit_site_table,$bigTable,$GetCodonInf,$Amino_acid_change,$substring_bilateral_sequence_of_site,$filter_sites_in_paralogous_regions,$filter_knownSNPs,$remove_conflict_editType, $src_utils_pslScore_pslScore, $pslScore2editSite ){
+foreach my $perl_script ($bestUniq,$sam2base,$GetAlignmentErrorsID,$filter_abnormal_alignment_forBWA,$Bam2FaQuery,$sam2base_statistic,$RNA_edit_site_table,$type2pos,$findOverlap,$addFeature2RNAediting,$filter_edit_site_table,$bigTable,$GetCodonInf,$Amino_acid_change,$filter_sites_in_paralogous_regions,$filter_knownSNPs,$remove_conflict_editType, $src_utils_pslScore_pslScore, $pslScore2editSite ){
 	die "Error: $perl_script is not existent!\n" unless -e $perl_script;
 }
 
