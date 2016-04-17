@@ -328,6 +328,10 @@ foreach my $sample (keys %hash){
 					}else{
 						my ($dna_info,$seq,$qua) = &dealCoverage(@A,$phred_DNA);
 						$table{$key1}{$key2}=$dna_info;
+						if(!$seq){
+							$table{$key1}{$key_SNPvalue}="NA";
+							next;
+						}
 						my @result;
 						if($method eq "Bayesian"){
 							@result = &SNPvalue_Bayesian($seq,$qua,$ploidy,\%BaseContent);

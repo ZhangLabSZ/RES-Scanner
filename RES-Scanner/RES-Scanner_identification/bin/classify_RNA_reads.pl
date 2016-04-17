@@ -49,7 +49,7 @@ Options:
 		--RNA_bam       FILE    The file.bam of RNA-seq data.
 		--samtools      FILE    The absolute path of pre-installed SAMtools package.
 		--phred         NUM     The Phred base quality for query QUALity of DNA.bam and RNA.bam files respectively, default DNA_ASCII-33,RNA_ASCII-33. [33,33]
-		--qual_cutoff   NUM     Quality cutoff for BWA alignment. [30]
+		--qual_cutoff   NUM     Base quality cutoff. [30]
 		--trim          INT     The number of bases solf-clipped at "5'end,3'end" of a read. [6,6]
 		--paralogous_R  NUM     Remove candidate editing sites from those regions that are similar to other parts of the genome
 		                        by BLAT alignment. 1 for yes, 0 for not. Note: force --blat. [1]
@@ -170,7 +170,7 @@ while(<IN>){
 					my $bamStrand= ($A[1]&16)==16 ? "-" : "+";
 					my $bamFq= ($A[1]&128)==128 ? "2" : "1";
 					my $bamRead=uc $A[9];
-					my $bamID="$A[0]/$bamFq;$A[2]:$pos";
+					my $bamID="$A[0]/$bamFq;$A[2]:$pos:$A[3]";
 					if($bamStrand eq "-"){
 						$bamRead=reverse $bamRead;
 						$bamRead=~tr/ATCGN/TAGCN/;

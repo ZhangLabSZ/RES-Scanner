@@ -104,7 +104,7 @@ while(<IN>){
 								$n=0;
 							}
 						}elsif($j==0){
-							if($OFFSET>1 && $i>0 && $array[$OFFSET-1]-$array[$OFFSET-2]>1){
+							if($OFFSET>1 && $i>0 && $M[$i-1]!~/S/ && $array[$OFFSET-1]-$array[$OFFSET-2]>1){
 								my $Nlen=$array[$OFFSET-1]-$array[$OFFSET-2]-1;
 								push @CIAGR,"${Nlen}N";
 							}

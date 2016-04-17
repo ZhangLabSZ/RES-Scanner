@@ -12,19 +12,17 @@
 use strict;
 use Getopt::Long;
 my ($pslScore,$junctionCoordinate,$editTable,$bestHitRatio);
-my $editDepth ||= 3;
-$bestHitRatio ||= 0.6;
+$bestHitRatio ||= 0.5;
 
 GetOptions(
 		"junctionCoordinate:s"=>\$junctionCoordinate,
 		"pslScore:s"=>\$pslScore,
 		"editTable:s"=>\$editTable,
-		"editDepth:s"=>\$editDepth,
 		"bestHitRatio:s"=>\$bestHitRatio,
 		);
 
 if(!$pslScore || !$editTable){
-	die "Usage: perl $0 --pslScore <psl.score> --junctionCoordinate [junctionCoordinate.file] --editTable [editTable] --editDepth [3] --bestHitRatio [0.6]\n";
+	die "Usage: perl $0 --pslScore <psl.score> --junctionCoordinate [junctionCoordinate.file] --editTable [editTable] --bestHitRatio [0.5]\n";
 }
 
 die "Error: $pslScore is not existent!" unless -e $pslScore;
@@ -50,6 +48,7 @@ if(defined $junctionCoordinate){
 my %hash;
 my @array;
 my $lastID;
+my $lastKey;
 open IN,"$pslScore" or die $!;
 while(<IN>){
 	chomp;
@@ -70,27 +69,27 @@ while(<IN>){
 	}
 
 	my ($queryID)=$A[3]=~/^(\S+):\d+\-\d+$/;
-	my ($editChr,$editPos)=$queryID=~/^\S+;(\S+):(\d+)$/;
+	my ($editChr,$editPos,$bamBeg)=$queryID=~/^\S+;(\S+):(\d+):(\d+)$/;
 	if(!defined $lastID){
 		$lastID=$queryID;
+		$lastKey="$editChr,$editPos";
 	}else{
-		if($lastID ne $queryID){
+		if($lastID ne $queryID || $lastKey ne "$editChr,$editPos"){
 			my $editFlag= &assess_pslScore(\@array);
-			my $key="$editChr,$editPos";
-			$hash{$key}{edit}+=$editFlag;
+			$hash{$lastKey}{edit}+=$editFlag;
 			$lastID=$queryID;
+			$lastKey="$editChr,$editPos";
 			@array=();
 		}
 	}
-	push @array,[$A[0],$A[1],$A[2],$queryID,$A[4],$editChr,$editPos];
+	push @array,[$A[0],$A[1],$A[2],$queryID,$A[4],$editChr,$editPos,$bamBeg];
 }
 close IN;
 
 if(@array){
-	my ($editChr,$editPos)=$lastID=~/^\S+;(\S+):(\d+)$/;
+	my ($editChr,$editPos,$bamBeg)=$lastID=~/^\S+;(\S+):(\d+):(\d+)$/;
 	my $editFlag= &assess_pslScore(\@array);
-	my $key="$editChr,$editPos";
-	$hash{$key}{edit}+=$editFlag;
+	$hash{$lastKey}{edit}+=$editFlag;
 }
 
 if($editTable=~/\.gz$/){
@@ -118,7 +117,7 @@ while(<IN>){
 		$hash{$key}{edit}=0;
 	}
 	my $ratio=sprintf "%.4f",$hash{$key}{edit}/$totalEdit;
-	if($ratio>=$bestHitRatio && $hash{$key}{edit}>=$editDepth){
+	if($ratio>=$bestHitRatio ){
 		print "$_\t$totalEdit\t$hash{$key}{edit}\t$ratio\n";
 	}
 }
@@ -132,8 +131,9 @@ sub assess_pslScore{
 	my $bestScore=$array[0][4];
 	if($bestScore==0){return 0;}
 	foreach my $a (@array){
-		my ($tID,$tbeg,$tend,$qID,$score,$editChr,$editPos)=@$a;
-		if($score == $bestScore && $tID eq $editChr && $editPos>=$tbeg && $editPos<=$tend){
+		my ($tID,$tbeg,$tend,$qID,$score,$editChr,$editPos,$bamBeg)=@$a;
+#		if( $tID eq $editChr && $bamBeg==$tbeg+1  && $editPos>=$tbeg && $editPos<=$tend){
+		if( $tID eq $editChr && $editPos>=$tbeg && $editPos<=$tend){	
 		}else{
 			if($score/$bestScore>=0.95){
 				return 0;

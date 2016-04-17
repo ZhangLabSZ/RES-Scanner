@@ -51,15 +51,17 @@ open (IN,$ARGV[1]) or die $!;
 while (<IN>) {
 	chomp;
 	my @info = split /\s+/;
-	next unless (exists $hash{$info[0]}{$info[1]}{$info[2]});
-	my @base = split //,$info[5];
-	$base[$info[4]] = $hash{$info[0]}{$info[1]}{$info[2]};
+	next unless (exists $hash{$info[1]}{$info[2]}{$info[3]});
+	my @base = split //,$info[6];
+	$base[$info[5]] = $hash{$info[1]}{$info[2]}{$info[3]};
 	my $codon = join "",@base;
-	my $C_c = join "->",$info[5],$codon;
+	my $C_c = join "->",$info[6],$codon;
+	$C_c="$info[0]:$C_c";
 	$CODE{$codon} = "*" unless (exists $CODE{$codon});
 	my $amino = $CODE{$codon};
-	my $C_a = join "$info[7]",$info[6],$amino;
-	$result{$info[0]}{$info[1]}{$info[2]} = [$C_c,$C_a];
+	my $C_a = join "$info[8]",$info[7],$amino;
+	$C_a = "$info[0]:$C_a";
+	push @{$result{$info[1]}{$info[2]}{$info[3]}} , [$C_c,$C_a];
 }
 close IN;
 
@@ -73,11 +75,27 @@ while (<IN>) {
 	next if (/^#/);
 	my @info = split /\s+/;
 	if (exists $result{$info[0]}{$info[1]}{$info[2]}) {
-		my $line = join "\t",@info,@{$result{$info[0]}{$info[1]}{$info[2]}};
+		my (@codon,@amino);
+		foreach my $arr (@{$result{$info[0]}{$info[1]}{$info[2]}}){
+			push @codon,$$arr[0];
+			push @amino,$$arr[1];
+		}
+		my $codon_line=join(";",@codon);
+		my $amino_line=join(";",@amino);
+		my $line = join "\t",@info,$codon_line,$amino_line;
 		print "$line\n";
 	} else {
 		my $line = join "\t",@info,"-","-";
 		print "$line\n";
+		if($info[-2] ne "-"){
+			my @tag=split /;/,$info[-2];
+			my @ID=split /;/,$info[-1];
+			for(my $i=0;$i<@tag;$i++){
+				if($tag[$i]=~/CDS/i){
+					print STDERR "Waring: The annotation of gene $ID[$i] is incomplete, as the length of transription is not a multiple of 3!\n";
+				}
+			}
+		}
 	}
 }
 close IN;

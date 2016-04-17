@@ -84,7 +84,7 @@ GetOptions(
 		"rmdup:s"=>\$rmdup,
 		"junctionCoordinate:s"=>\$junctionCoordinate,
 		"bestHitRatio:s"=>\$bestHitRatio,
-		"uniqTag"=>\$uniqTag,
+		"uniqTag:s"=>\$uniqTag,
 		"run"=>\$run,
 		"help"=>\$help,
 		);
@@ -175,6 +175,14 @@ foreach my $software ($samtools){
 }
 $samtools=abs_path $samtools;
 
+if($paralogous_R && !defined $blat){
+	die "Error: parameter '--paralogous_R 1' forece --blat\n";
+}
+
+if($genome=~/\.gz$/ && defined $blat){
+	die "Error: the reference $genome could not be compressed for blat.\n";
+}
+
 if(defined $blat){
 	die "Error: $blat is not existent!\n" unless -e $blat;
 	$blat=abs_path $blat;
@@ -190,6 +198,7 @@ my $RNA_edit_site_table = "$Bin/bin/RNA_edit_site_table.pl";
 my $classify_RNA_reads="$Bin/bin/classify_RNA_reads.pl";
 my $type2pos = "$Bin/bin/site2pos.pl";
 my $findOverlap = "$Bin/bin/findOverlap.pl";
+my $findOverlap_sameStrand = "$Bin/bin/findOverlap_sameStrand.pl";
 my $addFeature2RNAediting = "$Bin/bin/addFeature2RNAediting.pl";
 my $filter_edit_site_table = "$Bin/bin/filter_edit_site_table.pl";
 my $bigTable = "$Bin/bin/bigTable.pl";
@@ -200,6 +209,7 @@ my $filter_knownSNPs = "$Bin/bin/filter_knownSNPs.pl";
 my $remove_conflict_editType = "$Bin/bin/remove_conflict_editType.pl";
 my $src_utils_pslScore_pslScore = "$Bin/bin/src_utils_pslScore_pslScore.pl";
 my $pslScore2editSite = "$Bin/bin/pslScore2editSite.pl";
+my $Fdr_pvalue = "$Bin/bin/Fdr_pvalue.pl";
 
 foreach my $perl_script ($bestUniq,$sam2base,$GetAlignmentErrorsID,$filter_abnormal_alignment_forBWA,$Bam2FaQuery,$sam2base_statistic,$RNA_edit_site_table,$type2pos,$findOverlap,$addFeature2RNAediting,$filter_edit_site_table,$bigTable,$GetCodonInf,$Amino_acid_change,$filter_sites_in_paralogous_regions,$filter_knownSNPs,$remove_conflict_editType, $src_utils_pslScore_pslScore, $pslScore2editSite ){
 	die "Error: $perl_script is not existent!\n" unless -e $perl_script;
@@ -236,18 +246,38 @@ open TABLE,">$OutDir/bigTable.config" or die $!;
 
 my @STEP3LOG;
 
+my %hash_for_table;
+my %sampleHash;
+my %fileHash;
 open IN,"$config" or die $!;
 while(<IN>){
 	chomp;
-	my ($sampleID,$dnaBamfile,$rnaBamfile)=split /\s+/;
+	my ($sampleID,$dnaBamfile,$rnaBamfile,$chrID);
+	my @config_array=split /\s+/;
+	if(@config_array==3){
+		($sampleID,$dnaBamfile,$rnaBamfile)=@config_array;
+	}elsif(@config_array==4){
+		($sampleID,$dnaBamfile,$rnaBamfile,$chrID)=@config_array;
+		push @{$sampleHash{$sampleID}},$chrID;
+	}else{
+		die "Error: format of configure file should be three or four columns!\n";
+	}
+	my $SampleOutdir="$OutDir/$sampleID";
 	my $outdir="$OutDir/$sampleID";
+	if(@config_array==4){
+		$outdir="$OutDir/$sampleID/$chrID";
+	}
+	mkdir $SampleOutdir unless -e $SampleOutdir;
 	mkdir $outdir unless -e $outdir;
-
 	$dnaBamfile=abs_path $dnaBamfile;
 	$rnaBamfile=abs_path $rnaBamfile;
 	my $DNAfilename=basename($dnaBamfile);
 	my $RNAfilename=basename($rnaBamfile);
-	print TABLE "$sampleID\t$outdir\n";
+
+	if(!exists $hash_for_table{$sampleID}){
+		print TABLE "$sampleID\t$SampleOutdir\n";
+		$hash_for_table{$sampleID}=1;	
+	}
 
 #DNA shell beg
 	open STEP1DNA,">$outdir/step1_DNA.sh" or die $!;
@@ -259,7 +289,7 @@ while(<IN>){
 	}
 	print STEP1DNA "perl $bestUniq $outdir/$DNAfilename.DNA.sort.rmdup.bam $outdir $samtools --mq $mq --ss 0 --rmdup $rmdup --DNA --uniqTag $uniqTag\n";
 	print STEP1DNA "perl $sam2base --trim $trim $genome $outdir/$DNAfilename.DNA.sort.rmdup.bam.best.bam $outdir/$DNAfilename.best.DNA.sam2base.gz --samtools $samtools\n";
-	print STEP1DNA "perl $sam2base_statistic $genome $outdir/$DNAfilename.best.DNA.sam2base.gz > $outdir/$RNAfilename.best.DNA.sam2base.stat\n";
+	print STEP1DNA "perl $sam2base_statistic $genome $outdir/$DNAfilename.best.DNA.sam2base.gz > $outdir/$DNAfilename.best.DNA.sam2base.stat\n";
 	print STEP1DNA "echo $sampleID DNA step1 is completed! > $outdir/step1_DNA.log\n";
 	print STEP1DNA "echo $sampleID DNA step1 is completed!\n";
 	close STEP1DNA;
@@ -287,8 +317,8 @@ while(<IN>){
 		print STEP2RNANEG "if [ ! -f \"$outdir/step1_RNA.log\" ];then echo \"Warning: $outdir/step1_RNA.sh work is not completed! as $outdir/step1_RNA.log is not existent\"\nexit 0\nfi\n";
 		print STEP3POS "if [ ! -f \"$outdir/step2_RNA_pos.log\" ];then echo \"Warning: $outdir/step2_RNA_positive.sh work is not completed! as $outdir/step2_RNA_pos.log is not existent\"\nexit 0\nfi\n";
 		print STEP3NEG "if [ ! -f \"$outdir/step2_RNA_neg.log\" ];then echo \"Warning: $outdir/step2_RNA_negative.sh work is not completed! as $outdir/step2_RNA_neg.log is not existent\"\nexit 0\nfi\n";
-		print STEP3POS "if [ ! -f \"$outdir/step1_DNA.log\" ];then echo \"Warning: $outdir/step1_DNA.sh work is not completed! as $outdir/step2_RNA_pos.log is not existent\"\nexit 0\nfi\n";
-		print STEP3NEG "if [ ! -f \"$outdir/step1_DNA.log\" ];then echo \"Warning: $outdir/step1_DNA.sh work is not completed! as $outdir/step2_RNA_neg.log is not existent\"\nexit 0\nfi\n";
+		print STEP3POS "if [ ! -f \"$outdir/step1_DNA.log\" ];then echo \"Warning: $outdir/step1_DNA.sh work is not completed! as $outdir/step1_DNA.log is not existent\"\nexit 0\nfi\n";
+		print STEP3NEG "if [ ! -f \"$outdir/step1_DNA.log\" ];then echo \"Warning: $outdir/step1_DNA.sh work is not completed! as $outdir/step1_DNA.log is not existent\"\nexit 0\nfi\n";
 	}else{
 		open STEP2RNA,">$outdir/step2_RNA.sh" or die $!;
 		open STEP3,">$outdir/step3.sh" or die $!;
@@ -337,11 +367,11 @@ while(<IN>){
 			print STEP3POS "perl $src_utils_pslScore_pslScore $outdir/$RNAfilename.RNA.sort.rmdup.bam.positive.bam.editRead.fa.psl > $outdir/$RNAfilename.RNA.sort.rmdup.bam.positive.bam.editRead.fa.psl.score\n";
 			print STEP3NEG "perl $src_utils_pslScore_pslScore $outdir/$RNAfilename.RNA.sort.rmdup.bam.negative.bam.editRead.fa.psl > $outdir/$RNAfilename.RNA.sort.rmdup.bam.negative.bam.editRead.fa.psl.score\n";
 			if($junctionCoordinate){
-			print STEP3POS "perl $pslScore2editSite --pslScore $outdir/$RNAfilename.RNA.sort.rmdup.bam.positive.bam.editRead.fa.psl.score --junctionCoordinate $junctionCoordinate --editTable $outdir/$RNAfilename.positive.RNA.sam2base.homo.filter.gz --editDepth $editDepth --bestHitRatio $bestHitRatio | gzip > $outdir/temp.$RNAfilename.positive.RNA.sam2base.homo.filter.gz\n";
-			print STEP3NEG "perl $pslScore2editSite --pslScore $outdir/$RNAfilename.RNA.sort.rmdup.bam.negative.bam.editRead.fa.psl.score --junctionCoordinate $junctionCoordinate --editTable $outdir/$RNAfilename.negative.RNA.sam2base.homo.filter.gz --editDepth $editDepth --bestHitRatio $bestHitRatio | gzip > $outdir/temp.$RNAfilename.negative.RNA.sam2base.homo.filter.gz\n";
+			print STEP3POS "perl $pslScore2editSite --pslScore $outdir/$RNAfilename.RNA.sort.rmdup.bam.positive.bam.editRead.fa.psl.score --junctionCoordinate $junctionCoordinate --editTable $outdir/$RNAfilename.positive.RNA.sam2base.homo.filter.gz --bestHitRatio $bestHitRatio | gzip > $outdir/temp.$RNAfilename.positive.RNA.sam2base.homo.filter.gz\n";
+			print STEP3NEG "perl $pslScore2editSite --pslScore $outdir/$RNAfilename.RNA.sort.rmdup.bam.negative.bam.editRead.fa.psl.score --junctionCoordinate $junctionCoordinate --editTable $outdir/$RNAfilename.negative.RNA.sam2base.homo.filter.gz --bestHitRatio $bestHitRatio | gzip > $outdir/temp.$RNAfilename.negative.RNA.sam2base.homo.filter.gz\n";
 			}else{
-			print STEP3POS "perl $pslScore2editSite --pslScore $outdir/$RNAfilename.RNA.sort.rmdup.bam.positive.bam.editRead.fa.psl.score --editTable $outdir/$RNAfilename.positive.RNA.sam2base.homo.filter.gz --editDepth $editDepth --bestHitRatio $bestHitRatio | gzip > $outdir/temp.$RNAfilename.positive.RNA.sam2base.homo.filter.gz\n";
-			print STEP3NEG "perl $pslScore2editSite --pslScore $outdir/$RNAfilename.RNA.sort.rmdup.bam.negative.bam.editRead.fa.psl.score --editTable $outdir/$RNAfilename.negative.RNA.sam2base.homo.filter.gz --editDepth $editDepth --bestHitRatio $bestHitRatio | gzip > $outdir/temp.$RNAfilename.negative.RNA.sam2base.homo.filter.gz\n";
+			print STEP3POS "perl $pslScore2editSite --pslScore $outdir/$RNAfilename.RNA.sort.rmdup.bam.positive.bam.editRead.fa.psl.score --editTable $outdir/$RNAfilename.positive.RNA.sam2base.homo.filter.gz --bestHitRatio $bestHitRatio | gzip > $outdir/temp.$RNAfilename.positive.RNA.sam2base.homo.filter.gz\n";
+			print STEP3NEG "perl $pslScore2editSite --pslScore $outdir/$RNAfilename.RNA.sort.rmdup.bam.negative.bam.editRead.fa.psl.score --editTable $outdir/$RNAfilename.negative.RNA.sam2base.homo.filter.gz --bestHitRatio $bestHitRatio | gzip > $outdir/temp.$RNAfilename.negative.RNA.sam2base.homo.filter.gz\n";
 			}
 			print STEP3POS "mv -f $outdir/temp.$RNAfilename.positive.RNA.sam2base.homo.filter.gz $outdir/$RNAfilename.positive.RNA.sam2base.homo.filter.gz\n";
 			print STEP3NEG "mv -f $outdir/temp.$RNAfilename.negative.RNA.sam2base.homo.filter.gz $outdir/$RNAfilename.negative.RNA.sam2base.homo.filter.gz\n";
@@ -378,9 +408,9 @@ while(<IN>){
 	        print STEP3 "$blat $genome $outdir/$RNAfilename.RNA.sort.rmdup.bam.best.bam.editRead.fa $outdir/$RNAfilename.RNA.sort.rmdup.bam.best.bam.editRead.fa.psl -t=dna -q=dna -minIdentity=95 -noHead\n";
 			print STEP3 "perl $src_utils_pslScore_pslScore $outdir/$RNAfilename.RNA.sort.rmdup.bam.best.bam.editRead.fa.psl > $outdir/$RNAfilename.RNA.sort.rmdup.bam.best.bam.editRead.fa.psl.score\n";
 			if($junctionCoordinate){
-			print STEP3 "perl $pslScore2editSite --pslScore $outdir/$RNAfilename.RNA.sort.rmdup.bam.best.bam.editRead.fa.psl.score --junctionCoordinate $junctionCoordinate --editTable $outdir/$RNAfilename.best.RNA.sam2base.homo.filter.gz --editDepth $editDepth --bestHitRatio $bestHitRatio | gzip > $outdir/temp.$RNAfilename.best.RNA.sam2base.homo.filter.gz\n";
+			print STEP3 "perl $pslScore2editSite --pslScore $outdir/$RNAfilename.RNA.sort.rmdup.bam.best.bam.editRead.fa.psl.score --junctionCoordinate $junctionCoordinate --editTable $outdir/$RNAfilename.best.RNA.sam2base.homo.filter.gz --bestHitRatio $bestHitRatio | gzip > $outdir/temp.$RNAfilename.best.RNA.sam2base.homo.filter.gz\n";
 		    }else{
-			print STEP3 "perl $pslScore2editSite --pslScore $outdir/$RNAfilename.RNA.sort.rmdup.bam.best.bam.editRead.fa.psl.score --editTable $outdir/$RNAfilename.best.RNA.sam2base.homo.filter.gz --editDepth $editDepth --bestHitRatio $bestHitRatio | gzip > $outdir/temp.$RNAfilename.best.RNA.sam2base.homo.filter.gz\n";
+			print STEP3 "perl $pslScore2editSite --pslScore $outdir/$RNAfilename.RNA.sort.rmdup.bam.best.bam.editRead.fa.psl.score --editTable $outdir/$RNAfilename.best.RNA.sam2base.homo.filter.gz --bestHitRatio $bestHitRatio | gzip > $outdir/temp.$RNAfilename.best.RNA.sam2base.homo.filter.gz\n";
 			}
 		    print STEP3 "mv -f $outdir/temp.$RNAfilename.best.RNA.sam2base.homo.filter.gz $outdir/$RNAfilename.best.RNA.sam2base.homo.filter.gz\n";
 		}
@@ -405,6 +435,16 @@ while(<IN>){
 		print STEP2RE "sh $outdir/step2_RNA_negative.sh\n";
 		print STEP3RE "sh $outdir/step3_positive.sh\n";
 		print STEP3RE "sh $outdir/step3_negative.sh\n";
+
+		if(@config_array==4){
+			$fileHash{$sampleID}{$chrID}{RNA_sam2base_positive}="$outdir/$RNAfilename.positive.RNA.sam2base.gz";
+			$fileHash{$sampleID}{$chrID}{RNA_sam2base_negative}="$outdir/$RNAfilename.negative.RNA.sam2base.gz";
+			$fileHash{$sampleID}{$chrID}{DNA_sam2base}="$outdir/$DNAfilename.best.DNA.sam2base.gz";
+			$fileHash{$sampleID}{$chrID}{editSite_positive}="$outdir/$RNAfilename.positive.RNA.sam2base.homo.filter.gz";
+			$fileHash{$sampleID}{$chrID}{editSite_negative}="$outdir/$RNAfilename.negative.RNA.sam2base.homo.filter.gz";
+			$fileHash{$sampleID}{$chrID}{rawSite_positive}="$outdir/$RNAfilename.positive.RNA.sam2base.homo.gz";
+			$fileHash{$sampleID}{$chrID}{rawSite_negative}="$outdir/$RNAfilename.negative.RNA.sam2base.homo.gz";
+		}
 	}else{
 		print STEP2RNA "echo $sampleID step2 work is completed! > $outdir/step2_RNA.log\n";
 		print STEP3 "echo $sampleID step3 work is completed! > $outdir/step3.log\n";
@@ -416,8 +456,16 @@ while(<IN>){
 		close STEP3;
 		print STEP2RE "sh $outdir/step2_RNA.sh\n";
 		print STEP3RE "sh $outdir/step3.sh\n";
+
+		if(@config_array==4){
+			$fileHash{$sampleID}{$chrID}{RNA_sam2base}="$outdir/$RNAfilename.best.RNA.sam2base.gz";
+			$fileHash{$sampleID}{$chrID}{DNA_sam2base}="$outdir/$DNAfilename.best.DNA.sam2base.gz";
+			$fileHash{$sampleID}{$chrID}{editSite}="$outdir/$RNAfilename.best.RNA.sam2base.homo.filter.gz";
+			$fileHash{$sampleID}{$chrID}{rawSite}="$outdir/$RNAfilename.best.RNA.sam2base.homo.gz";
+		}
 	}
 #RNA shell end
+
 
 }
 close IN;
@@ -429,6 +477,60 @@ close TABLE;
 
 foreach my $logfile (@STEP3LOG){
 	print STEP4RE "if [ ! -f \"$logfile\" ];then echo \"Warning: step3 work is not completed! as $logfile is not existent\"\nexit 0\nfi\n";
+}
+
+
+if(%fileHash){        # process multiple parts/chromosomes for each sample.
+	foreach my $sampleID (keys %fileHash){
+		my $SampleOutdir="$OutDir/$sampleID";
+		if($ss){
+			my $RNA_sam2base_positive_files;
+			my $RNA_sam2base_negative_files;
+			my $DNA_sam2base_files;
+			my $editSite_positive_files;
+			my $editSite_negative_files;
+			my $rawSite_positive_files;
+			my $rawSite_negative_files;
+			foreach my $chrID (sort keys %{$fileHash{$sampleID}}){
+				$RNA_sam2base_positive_files .= " $fileHash{$sampleID}{$chrID}{RNA_sam2base_positive}";
+				$RNA_sam2base_negative_files .= " $fileHash{$sampleID}{$chrID}{RNA_sam2base_negative}";
+				$DNA_sam2base_files .= " $fileHash{$sampleID}{$chrID}{DNA_sam2base}";
+				$editSite_positive_files .= " $fileHash{$sampleID}{$chrID}{editSite_positive}";
+				$editSite_negative_files .= " $fileHash{$sampleID}{$chrID}{editSite_negative}";
+				$rawSite_positive_files .= " $fileHash{$sampleID}{$chrID}{rawSite_positive}";
+				$rawSite_negative_files .= " $fileHash{$sampleID}{$chrID}{rawSite_negative}";
+			}
+			print STEP4RE "zcat $RNA_sam2base_positive_files | gzip > $SampleOutdir/$sampleID.positive.RNA.sam2base.gz\n";
+			print STEP4RE "rm $RNA_sam2base_positive_files\n";
+			print STEP4RE "zcat $RNA_sam2base_negative_files | gzip > $SampleOutdir/$sampleID.negative.RNA.sam2base.gz\n";
+			print STEP4RE "rm $RNA_sam2base_negative_files\n";
+			print STEP4RE "zcat $DNA_sam2base_files | gzip > $SampleOutdir/$sampleID.best.DNA.sam2base.gz\n";
+			print STEP4RE "rm $DNA_sam2base_files\n";
+			print STEP4RE "perl $Fdr_pvalue $rawSite_positive_files $editSite_positive_files | gzip > $SampleOutdir/$sampleID.positive.RNA.sam2base.homo.filter.gz\n";
+			print STEP4RE "rm $rawSite_positive_files $editSite_positive_files\n";
+			print STEP4RE "perl $Fdr_pvalue $rawSite_negative_files $editSite_negative_files | gzip > $SampleOutdir/$sampleID.negative.RNA.sam2base.homo.filter.gz\n";
+			print STEP4RE "rm $rawSite_negative_files $editSite_negative_files\n";
+			print STEP4RE "perl $sam2base_statistic $genome $SampleOutdir/$sampleID.best.DNA.sam2base.gz > $SampleOutdir/$sampleID.best.DNA.sam2base.stat\n";
+		}else{
+			my $RNA_sam2base_files;
+			my $DNA_sam2base_files;
+			my $editSite_files;
+			my $rawSite_files;
+			foreach my $chrID (sort keys %{$fileHash{$sampleID}}){
+				$RNA_sam2base_files .= " $fileHash{$sampleID}{$chrID}{RNA_sam2base}";
+				$DNA_sam2base_files .= " $fileHash{$sampleID}{$chrID}{DNA_sam2base}";
+				$editSite_files .= " $fileHash{$sampleID}{$chrID}{editSite}";
+				$rawSite_files .= " $fileHash{$sampleID}{$chrID}{rawSite}";
+			}
+			print STEP4RE "zcat $RNA_sam2base_files | gzip > $SampleOutdir/$sampleID.best.RNA.sam2base.gz\n";
+			print STEP4RE "rm $RNA_sam2base_files\n";
+			print STEP4RE "zcat $DNA_sam2base_files | gzip > $SampleOutdir/$sampleID.best.DNA.sam2base.gz\n";
+			print STEP4RE "rm $DNA_sam2base_files\n";
+			print STEP4RE "perl $Fdr_pvalue $rawSite_files $editSite_files | gzip > $SampleOutdir/$sampleID.best.RNA.sam2base.homo.filter.gz\n";
+			print STEP4RE "rm $rawSite_files $editSite_files\n";
+			print STEP4RE "perl $sam2base_statistic $genome $SampleOutdir/$sampleID.best.DNA.sam2base.gz > $SampleOutdir/$sampleID.best.DNA.sam2base.stat\n";
+		}
+	}
 }
 
 
@@ -459,7 +561,11 @@ if(defined $posdir){
 	foreach my $pos_file (@posfile){ 
 		my $pos_filename=basename $pos_file;
 		my ($ele)=$pos_filename=~/^(\S+)\.pos$/;
-		print STEP4RE "perl $findOverlap $OutDir/RES_final_result.txt.pos $pos_file > $find_dir/RES_final_result.txt.pos-${ele}.overlap\n";
+		if($ss && ($ele=~/CDS/i || $ele=~/intron/i || $ele=~/UTR/i || $ele=~/gene/i)){
+			print STEP4RE "perl $findOverlap_sameStrand $OutDir/RES_final_result.txt.pos $pos_file > $find_dir/RES_final_result.txt.pos-${ele}.overlap\n";
+		}else{
+			print STEP4RE "perl $findOverlap $OutDir/RES_final_result.txt.pos $pos_file > $find_dir/RES_final_result.txt.pos-${ele}.overlap\n";
+		}
 	}
 	print STEP4RE "perl $addFeature2RNAediting $find_dir $OutDir/RES_final_result.txt  > $OutDir/RES_final_result.annotation\n";
 	print STEP4RE "rm -rf $find_dir\n";

@@ -139,7 +139,7 @@ foreach my $id (sort keys %ID) {
 					my $base = substr($CDS{$id},$str_a+$phase,1);
 					#$locus{$sca}{$i}{$strand} = [$base,$phase,$codon];
 					$CODE{$codon} = "*" unless (exists $CODE{$codon});
-					my $lin = join "\t",$sca,$i,$strand,$base,$phase,$codon,$CODE{$codon},$num+1;
+					my $lin = join "\t",$id,$sca,$i,$strand,$base,$phase,$codon,$CODE{$codon},$num+1;
 					print "$lin\n"
 				}
 			}  
@@ -158,7 +158,7 @@ foreach my $id (sort keys %ID) {
 					my $base = substr($CDS{$id},$str_a+$phase,1);
 					#$locus{$sca}{$i}{$strand} = [$base,$phase,$codon];
 					$CODE{$codon} = "*" unless (exists $CODE{$codon});
-					my $lin = join "\t",$sca,$i,$strand,$base,$phase,$codon,$CODE{$codon},$num+1;
+					my $lin = join "\t",$id,$sca,$i,$strand,$base,$phase,$codon,$CODE{$codon},$num+1;
 					print "$lin\n"
 				}
 
