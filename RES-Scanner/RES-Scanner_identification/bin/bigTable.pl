@@ -556,7 +556,18 @@ foreach my $key1 (sort keys %table){
 			}
 		}
 		if($total_dna_dep>=$DNAdepth && $total_rna_dep>=$RNAdepth && $table{$key1}{$key_Editvalue}<0.05){
-			push @info,$table{$key1}{$key_DNA},"$table{$key1}{$key_RNA};$table{$key1}{$key_Editvalue}*";
+        	my ($alt_base)=$table{$key1}{type}=~/\w->(\w)/;
+			my $strand=(split /,/,$key1)[2];
+			if($strand eq "-"){
+				$alt_base=~tr/ATGC/TACG/;
+			}
+			my @dep=split /\,/,$table{$key1}{$key_RNA};
+			my %baseDepth=("A",$dep[0],"C",$dep[1],"G",$dep[2],"T",$dep[3]);			
+			if($baseDepth{$alt_base}>0){
+				push @info,$table{$key1}{$key_DNA},"$table{$key1}{$key_RNA};$table{$key1}{$key_Editvalue}*";
+			}else{
+				push @info,$table{$key1}{$key_DNA},"$table{$key1}{$key_RNA};$table{$key1}{$key_Editvalue}";
+			}
 		}else{
 			push @info,$table{$key1}{$key_DNA},"$table{$key1}{$key_RNA};$table{$key1}{$key_Editvalue}";
 		}
