@@ -3,7 +3,8 @@
 #  pslScore.pl - a reproduction of the C library calculations from
 #                src/lib/psl.c
 #
-
+## Source code of this script is from http://genome-source.cse.ucsc.edu/gitweb/?p=kent.git;a=blob_plain;f=src/utils/pslScore/pslScore.pl
+#
 use strict;
 use warnings;
 
